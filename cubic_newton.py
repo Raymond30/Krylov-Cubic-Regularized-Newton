@@ -1,15 +1,12 @@
 import sklearn.datasets
 import urllib.request
 
-from loss import LogisticRegression
+from optimizer.loss import LogisticRegression
 
-from cubic import Cubic, Cubic_LS
-from GD_LS import GD_LS
+from optimizer.cubic import Cubic, Cubic_LS
+from optimizer.GD import Gd, GD_LS
 
-
-
-from optmethods.first_order import Gd
-from optmethods.second_order import RegNewton
+from optimizer.reg_newton import RegNewton
 
 import matplotlib.pyplot as plt
 
