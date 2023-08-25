@@ -1,18 +1,14 @@
 import sklearn.datasets
 import urllib.request
 
-from optimizer.loss import LogisticRegression
-
-from optimizer.cubic import Cubic, Cubic_LS
-from optimizer.GD import Gd, GD_LS
-
-from optimizer.reg_newton import RegNewton
-
+import numpy as np
 import matplotlib.pyplot as plt
 
+from optimizer.loss import LogisticRegression
+from optimizer.cubic import Cubic, Cubic_LS
+from optimizer.GD import Gd, GD_LS
+from optimizer.reg_newton import RegNewton
 
-
-import numpy as np
 
 if __name__ == '__main__':
     # Define the loss function
@@ -27,6 +23,7 @@ if __name__ == '__main__':
     A, b = sklearn.datasets.load_svmlight_file(data_path)
     A = A.toarray()
 
+    # Logistic regression problem
     loss = LogisticRegression(A, b, l1=0, l2=0)
     n, dim = A.shape
     L = loss.smoothness
@@ -36,15 +33,17 @@ if __name__ == '__main__':
     it_max = 200
 
     # Define the optimization algs
-    flag_LS = True
+    flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
 
     memeory_size = 10
     if not flag_LS:
         gd = Gd(loss=loss, label='GD')
+        # grid search for lr
         lr_gd = np.geomspace(start=1e0, stop=1e6, num=7) / L
         cub_krylov = Cubic(loss=loss, label='Cubic Newton (Krylov dim = {})'.format(memeory_size),
                            cubic_solver="krylov", solver_it_max=memeory_size)
         cub_root = Cubic(loss=loss, label='Cubic Newton',cubic_solver="root")
+        # grid search for regularization parameter
         reg_cub = np.geomspace(start=1e-8, stop=1e-2, num=7) * loss.hessian_lipschitz
     else:
         gd = GD_LS(loss=loss, label='GD LS')
@@ -52,7 +51,7 @@ if __name__ == '__main__':
                               cubic_solver="krylov", solver_it_max=memeory_size, tolerance = 1e-9)
         cub_root = Cubic_LS(loss=loss, label='Cubic Newton LS',cubic_solver="root", tolerance = 1e-8)
 
-
+    # A benchmark algorithm that is used to compute the optimal solution
     adan = RegNewton(loss=loss, adaptive=True, use_line_search=True, 
                      label='AdaN')
     
@@ -69,12 +68,14 @@ if __name__ == '__main__':
             print(f'Loss value: {loss_gd}')
             if loss_gd < best_loss_gd:
                 best_loss_gd = loss_gd
-                best_lr_gd = lr    
+                best_lr_gd = lr
+                # save the best result    
                 gd.trace.save('GD_best')
             gd.reset(loss=loss)
         
+        # load the best result
         gd.from_pickle('./results/GD_best',loss=loss)
-        gd.trace.label = f'GD (lr={best_lr_gd})'
+        # gd.trace.label = f'GD (lr={best_lr_gd})'
     else:
         print(f'Running optimizer: {gd.label}')
         gd.run(x0=x0, it_max=it_max)
@@ -110,7 +111,7 @@ if __name__ == '__main__':
             cub_root.reset(loss=loss)
         
         cub_root.from_pickle('./results/Cubic_best',loss=loss)
-        cub_root.trace.label = f'Cubic Newton (Reg={best_reg_cub_root})'
+        # cub_root.trace.label = f'Cubic Newton (Reg={best_reg_cub_root})'
 
         best_loss_cub_krylov = np.inf
         best_reg_cub_krylov = None
@@ -128,7 +129,7 @@ if __name__ == '__main__':
             cub_krylov.reset(loss=loss)
         
         cub_krylov.from_pickle('./results/Cubic_krylov_best',loss=loss)
-        cub_krylov.trace.label = f'Cubic Newton (Krylov dim ={memeory_size}, Reg={best_reg_cub_root})'
+        # cub_krylov.trace.label = f'Cubic Newton (Krylov dim ={memeory_size}, Reg={best_reg_cub_root})'
 
     else:
         print(f'Running optimizer: {cub_root.label}')
@@ -140,7 +141,7 @@ if __name__ == '__main__':
         cub_krylov.compute_loss_of_iterates()
 
     # Plot the loss curve
-    flag_time = False
+    flag_time = False # True for iteration, False for time
     gd.trace.plot_losses(marker='^', time=flag_time)
     # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
