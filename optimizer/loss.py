@@ -10,7 +10,7 @@ import warnings
 from numba import njit
 from sklearn.utils.extmath import row_norms, safe_sparse_dot
 
-from utils import safe_sparse_add, safe_sparse_multiply, safe_sparse_norm, safe_sparse_inner_prod
+from optimizer.utils import safe_sparse_add, safe_sparse_multiply, safe_sparse_norm, safe_sparse_inner_prod
 
 class Oracle():
     """
