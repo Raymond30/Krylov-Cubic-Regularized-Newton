@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from optimizer.loss import LogisticRegression
-from optimizer.cubic import Cubic, Cubic_LS
+from optimizer.cubic import Cubic, Cubic_LS, SSCN
 from optimizer.GD import Gd, GD_LS
 from optimizer.reg_newton import RegNewton
 
@@ -35,25 +35,32 @@ if __name__ == '__main__':
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
 
-    memeory_size = 10
+    memory_size = 20
     if not flag_LS:
         gd = Gd(loss=loss, label='GD')
         # grid search for lr
         lr_gd = np.geomspace(start=1e0, stop=1e6, num=7) / L
-        cub_krylov = Cubic(loss=loss, label='Cubic Newton (Krylov dim = {})'.format(memeory_size),
-                           cubic_solver="krylov", solver_it_max=memeory_size)
+        cub_krylov = Cubic(loss=loss, label='Cubic Newton (Krylov dim = {})'.format(memory_size),
+                           cubic_solver="krylov", solver_it_max=memory_size)
         cub_root = Cubic(loss=loss, label='Cubic Newton',cubic_solver="root")
         # grid search for regularization parameter
         reg_cub = np.geomspace(start=1e-8, stop=1e-2, num=7) * loss.hessian_lipschitz
     else:
         gd = GD_LS(loss=loss, label='GD LS')
-        cub_krylov = Cubic_LS(loss=loss, label='Cubic Newton LS (Krylov dim = {})'.format(memeory_size),
-                              cubic_solver="krylov", solver_it_max=memeory_size, tolerance = 1e-9)
+        cub_krylov = Cubic_LS(loss=loss, label='Cubic Newton LS (Krylov dim = {})'.format(memory_size),
+                              cubic_solver="krylov", solver_it_max=memory_size, tolerance = 1e-9)
         cub_root = Cubic_LS(loss=loss, label='Cubic Newton LS',cubic_solver="root", tolerance = 1e-8)
+        sscn = SSCN(loss=loss, label='SSCN (subspace dim = {})'.format(memory_size),
+                               sub_dim=memory_size, tolerance = 1e-9)
 
     # A benchmark algorithm that is used to compute the optimal solution
     adan = RegNewton(loss=loss, adaptive=True, use_line_search=True, 
                      label='AdaN')
+    
+    # benchmark: SSCN
+    print(f'Running optimizer: {sscn.label}')
+    sscn.run(x0=x0, it_max=it_max)
+    sscn.compute_loss_of_iterates()
     
     # Running algs
     if not flag_LS:
@@ -140,6 +147,8 @@ if __name__ == '__main__':
         cub_krylov.run(x0=x0, it_max=it_max)
         cub_krylov.compute_loss_of_iterates()
 
+
+
     # Plot the loss curve
     flag_time = False # True for iteration, False for time
     gd.trace.plot_losses(marker='^', time=flag_time)
@@ -147,6 +156,8 @@ if __name__ == '__main__':
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
     cub_root.trace.plot_losses(marker='s', time=flag_time)
     cub_krylov.trace.plot_losses(marker='d', time=flag_time)
+
+    sscn.trace.plot_losses(marker='o', time=flag_time)
 
     # print(cub.trace.loss_vals)
     ## plt.xscale('log')
