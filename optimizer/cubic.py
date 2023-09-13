@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-
+import copy
 
 from scipy.optimize import root_scalar
 
@@ -325,4 +325,100 @@ class Cubic_LS(Optimizer):
         
     def update_trace(self):
         super(Cubic_LS, self).update_trace()
+        self.trace.solver_its.append(self.solver_it)
+
+
+
+class SSCN(Optimizer):
+    """
+    Newton method with cubic regularization with line search for global convergence.
+    The method was studied by Nesterov and Polyak in the following paper:
+        "Cubic regularization of Newton method and its global performance"
+        https://link.springer.com/article/10.1007/s10107-006-0706-8
+    
+    Arguments:
+        reg_coef (float, optional): an estimate of the Hessian's Lipschitz constant
+    """
+    def __init__(self, reg_coef=None, sub_dim=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
+        super(SSCN, self).__init__(*args, **kwargs)
+        self.reg_coef = reg_coef
+        self.solver_it = 0
+        self.sub_dim = sub_dim
+        self.solver_eps = solver_eps
+
+        self.beta = beta
+        self.r0 = 0.1
+        self.residuals = []
+        self.value = None
+
+        if reg_coef is None:
+            self.reg_coef = self.loss.hessian_lipschitz
+        # if cubic_solver == "GD": 
+        #     self.cubic_solver = ls_cubic_solver
+        # elif cubic_solver == "root":
+        #     self.cubic_solver = cubic_solver_root
+        # elif cubic_solver == "krylov":
+        #     self.cubic_solver = cubic_solver_krylov
+        # else:
+        #     print("Error: cubic_solver not recognized")
+        # if cubic_solver is None:
+        #     # self.cubic_solver = ls_cubic_solver
+        #     self.cubic_solver = cubic_solver_root
+    
+    
+    def step(self):
+        if self.value is None:
+            self.value = self.loss.value(self.x)
+        
+        # sample random coordinates
+        I = np.random.choice(self.dim, size=self.sub_dim, replace=False)
+        
+        # partial derivative information
+        self.grad = self.loss.partial_gradient(self.x, I)
+        self.hess = self.loss.partial_hessian(self.x, I)
+
+        # if self.cubic_solver is cubic_solver_krylov:
+        #     self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
+        #     V, alphas, betas, beta = Lanczos(self.hess, self.grad, m=self.solver_it_max)
+        #     self.hess = np.diag(alphas) + np.diag(betas, -1) + np.diag(betas, 1)
+        #     id_matrix = np.eye(len(alphas))
+        #     e1 = np.zeros(len(alphas))
+        #     e1[0] = 1
+        #     self.grad = np.linalg.norm(self.grad)*e1
+        # else:
+        #     self.hess = self.loss.hessian(self.x)
+        #     V = None
+
+        if np.linalg.norm(self.grad) < self.tolerance:
+            return
+        # set the initial value of the regularization coefficient
+        reg_coef = self.reg_coef*self.beta
+
+        x_sub = self.x[I]
+        x_new = copy.deepcopy(self.x)
+        x_new_sub, solver_it, r0_new, residual, model_decrease = cubic_solver_root(x_sub, self.grad, self.hess, 
+        reg_coef, r0 = self.r0)
+        x_new[I] = x_new_sub
+        
+        value_new = self.loss.value(x_new)
+        while value_new > self.value - model_decrease:
+            reg_coef = reg_coef/self.beta
+            x_new_sub, solver_it, r0_new, residual, model_decrease = cubic_solver_root(x_sub, self.grad, self.hess, 
+            reg_coef, r0 = self.r0)
+            x_new[I] = x_new_sub
+            value_new = self.loss.value(x_new)
+        self.x = x_new
+        self.reg_coef = reg_coef
+        self.value = value_new
+        self.r0 = r0_new
+        
+        self.solver_it += solver_it
+        self.residuals.append(residual)
+        
+    def init_run(self, *args, **kwargs):
+        super(SSCN, self).init_run(*args, **kwargs)
+        self.trace.solver_its = [0]
+        
+    def update_trace(self):
+        super(SSCN, self).update_trace()
         self.trace.solver_its.append(self.solver_it)

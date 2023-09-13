@@ -230,6 +230,11 @@ class LogisticRegression(Oracle):
             grad = scipy.sparse.csr_matrix(grad).T
         return grad
     
+    def partial_gradient(self,x,I):
+        # I is an index set; return the gradient for the coordinates in I
+        grad = self.gradient(x)
+        return grad[I]
+    
     # def stochastic_gradient(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
     #                         importance_sampling=False, p=None, rng=None, return_idx=False):
     #     """
@@ -275,6 +280,10 @@ class LogisticRegression(Oracle):
         weights = activation * (1-activation)
         A_weighted = safe_sparse_multiply(self.A.T, weights)
         return A_weighted@self.A/self.n + self.l2*np.eye(self.dim)
+    
+    def partial_hessian(self, x, I):
+        hess = self.hessian(x)
+        return hess[I,I]
     
     # def stochastic_hessian(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
     #                        rng=None, return_idx=False):
