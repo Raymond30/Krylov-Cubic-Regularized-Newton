@@ -371,7 +371,7 @@ class SSCN(Optimizer):
             self.value = self.loss.value(self.x)
         
         # sample random coordinates
-        I = np.random.choice(self.dim, size=self.sub_dim, replace=False)
+        I = self.rng.choice(self.dim, size=self.sub_dim, replace=False)
         
         # partial derivative information
         self.grad = self.loss.partial_gradient(self.x, I)
