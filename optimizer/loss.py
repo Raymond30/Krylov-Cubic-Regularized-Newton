@@ -232,8 +232,15 @@ class LogisticRegression(Oracle):
     
     def partial_gradient(self,x,I):
         # I is an index set; return the gradient for the coordinates in I
-        grad = self.gradient(x)
-        return grad[I]
+        Ax = self.mat_vec_product(x)
+        activation = scipy.special.expit(Ax)
+        if self.l2 == 0:
+            grad = self.A.T[I,:]@(activation-self.b)/self.n
+        else:
+            grad = safe_sparse_add(self.A.T[I,:]@(activation-self.b)/self.n, self.l2*x[I])
+        if scipy.sparse.issparse(x):
+            grad = scipy.sparse.csr_matrix(grad).T
+        return grad
     
     # def stochastic_gradient(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
     #                         importance_sampling=False, p=None, rng=None, return_idx=False):
@@ -282,8 +289,12 @@ class LogisticRegression(Oracle):
         return A_weighted@self.A/self.n + self.l2*np.eye(self.dim)
     
     def partial_hessian(self, x, I):
-        hess = self.hessian(x)
-        return hess[I,I]
+        Ax = self.mat_vec_product(x)
+        activation = scipy.special.expit(Ax)
+        weights = activation * (1-activation)
+        A_weighted = safe_sparse_multiply(self.A.T[I,:], weights)
+        dim = len(I)
+        return A_weighted@self.A[:,I]/self.n + self.l2*np.eye(dim)
     
     # def stochastic_hessian(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
     #                        rng=None, return_idx=False):
