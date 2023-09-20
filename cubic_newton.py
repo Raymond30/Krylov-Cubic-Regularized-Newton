@@ -12,19 +12,22 @@ from optimizer.reg_newton import RegNewton
 
 if __name__ == '__main__':
     # Define the loss function
-    dataset = './w8a'
-    if dataset == 'mushrooms':
-        data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
-        data_path = './mushrooms'
-    else:
-        data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/w8a"
-        data_path = './w8a'
+    dataset = 'madelon'
+    # if dataset == 'mushrooms':
+    #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
+    #     data_path = './mushrooms'
+    # else:
+    #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/w8a"
+    #     data_path = './w8a'
+    data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/{}".format(dataset)
+    data_path = './{}'.format(dataset)
+
     f = urllib.request.urlretrieve(data_url, data_path)
     A, b = sklearn.datasets.load_svmlight_file(data_path)
     A = A.toarray()
 
     # Logistic regression problem
-    loss = LogisticRegression(A, b, l1=0, l2=0)
+    loss = LogisticRegression(A, b, l1=0, l2=0, store_mat_vec_prod=True)
     n, dim = A.shape
     L = loss.smoothness
     # l2 = 1e-10 * L # make the problem ill-conditioned
@@ -35,7 +38,7 @@ if __name__ == '__main__':
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
 
-    memory_size = 20
+    memory_size = 10
     if not flag_LS:
         gd = Gd(loss=loss, label='GD')
         # grid search for lr
@@ -91,6 +94,7 @@ if __name__ == '__main__':
     print(f'Running optimizer: {adan.label}')
     adan.run(x0=x0, it_max=100)
     adan.compute_loss_of_iterates()
+
     # print(gd.trace.loss_vals)
 
     # print(f'Running optimizer: {cub_krylov.label}-Krylov')
@@ -139,18 +143,19 @@ if __name__ == '__main__':
         # cub_krylov.trace.label = f'Cubic Newton (Krylov dim ={memeory_size}, Reg={best_reg_cub_root})'
 
     else:
-        print(f'Running optimizer: {cub_root.label}')
-        cub_root.run(x0=x0, it_max=it_max)
-        cub_root.compute_loss_of_iterates()
-
         print(f'Running optimizer: {cub_krylov.label}')
         cub_krylov.run(x0=x0, it_max=it_max)
         cub_krylov.compute_loss_of_iterates()
 
+        print(f'Running optimizer: {cub_root.label}')
+        cub_root.run(x0=x0, it_max=it_max)
+        cub_root.compute_loss_of_iterates()
+
+
 
 
     # Plot the loss curve
-    flag_time = False # True for iteration, False for time
+    flag_time = True # True for time, False for iteration
     gd.trace.plot_losses(marker='^', time=flag_time)
     # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
