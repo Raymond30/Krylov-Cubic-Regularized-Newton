@@ -7,7 +7,7 @@ from scipy.optimize import root_scalar
 
 import random
 import os
-
+import time
 
 from optimizer.optimizer import Optimizer
 
@@ -108,7 +108,8 @@ def cubic_solver_root(x, g, H, M, V=None, it_max=100, epsilon=1e-8, loss=None, r
     sol = root_scalar(func, fprime=grad, x0 = r0, method='newton')
     r = sol.root
     s = -np.linalg.solve(H + r*id_matrix, g)
-    model_decrease = M/6*np.linalg.norm(s)**3 - np.dot(g,s)/2
+    norm_s = np.linalg.norm(s)
+    model_decrease = r/2*norm_s**2-M/3*norm_s**3 - np.dot(g,s)/2
     return x + s, sol.iterations, r, None, model_decrease
 
 def Lanczos(A,v,m=10):
@@ -182,7 +183,8 @@ def cubic_solver_krylov(x, g, H, M, V, it_max=5, epsilon=1e-8, loss=None, r0 = 0
     sol = root_scalar(func, fprime=grad, x0 = r0, method='newton')
     r = sol.root
     s = -np.linalg.solve(H + r*id_matrix, g)
-    model_decrease = M/6*np.linalg.norm(s)**3 - np.dot(g,s)/2
+    norm_s = np.linalg.norm(s)
+    model_decrease = r/2*norm_s**2-M/3*norm_s**3 - np.dot(g,s)/2
     return x + V @ s, sol.iterations, r, residual, model_decrease
 
 class Cubic(Optimizer):
@@ -281,19 +283,26 @@ class Cubic_LS(Optimizer):
     
     
     def step(self):
+
         if self.value is None:
             self.value = self.loss.value(self.x)
         
         self.grad = self.loss.gradient(self.x)
 
         if self.cubic_solver is cubic_solver_krylov:
+            
             self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
+            # krylov_start = time.time()
             V, alphas, betas, beta = Lanczos(self.hess, self.grad, m=self.solver_it_max)
+            # krylov_end = time.time()
+            # print('Krylov Time {time:.3f}'.format(time=krylov_end - krylov_start))
             self.hess = np.diag(alphas) + np.diag(betas, -1) + np.diag(betas, 1)
             id_matrix = np.eye(len(alphas))
             e1 = np.zeros(len(alphas))
             e1[0] = 1
             self.grad = np.linalg.norm(self.grad)*e1
+            
+            
         else:
             self.hess = self.loss.hessian(self.x)
             V = None
@@ -302,6 +311,8 @@ class Cubic_LS(Optimizer):
             return
         # set the initial value of the regularization coefficient
         reg_coef = self.reg_coef*self.beta
+
+        # LS_start = time.time()
 
         x_new, solver_it, r0_new, residual, model_decrease = self.cubic_solver(self.x, self.grad, self.hess, 
         reg_coef, V, self.solver_it_max, self.solver_eps, r0 = self.r0)
@@ -318,6 +329,8 @@ class Cubic_LS(Optimizer):
         
         self.solver_it += solver_it
         self.residuals.append(residual)
+        # LS_end = time.time()
+        # print('LS Time {time:.3f}'.format(time=LS_end - LS_start))
         
     def init_run(self, *args, **kwargs):
         super(Cubic_LS, self).init_run(*args, **kwargs)
