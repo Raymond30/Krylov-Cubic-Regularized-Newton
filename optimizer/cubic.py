@@ -390,18 +390,6 @@ class SSCN(Optimizer):
         self.grad = self.loss.partial_gradient(self.x, I)
         self.hess = self.loss.partial_hessian(self.x, I)
 
-        # if self.cubic_solver is cubic_solver_krylov:
-        #     self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
-        #     V, alphas, betas, beta = Lanczos(self.hess, self.grad, m=self.solver_it_max)
-        #     self.hess = np.diag(alphas) + np.diag(betas, -1) + np.diag(betas, 1)
-        #     id_matrix = np.eye(len(alphas))
-        #     e1 = np.zeros(len(alphas))
-        #     e1[0] = 1
-        #     self.grad = np.linalg.norm(self.grad)*e1
-        # else:
-        #     self.hess = self.loss.hessian(self.x)
-        #     V = None
-
         if np.linalg.norm(self.grad) < self.tolerance:
             return
         # set the initial value of the regularization coefficient
