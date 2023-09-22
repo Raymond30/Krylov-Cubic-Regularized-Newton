@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from optimizer.loss import LogisticRegression
-from optimizer.cubic import Cubic, Cubic_LS, SSCN
+from optimizer.cubic import Cubic, Cubic_LS, Cubic_Krylov_LS, SSCN
 from optimizer.GD import Gd, GD_LS
 from optimizer.reg_newton import RegNewton
 
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
 
-    memory_size = 2
+    memory_size = 10
     if not flag_LS:
         gd = Gd(loss=loss, label='GD')
         # grid search for lr
@@ -55,11 +55,11 @@ if __name__ == '__main__':
         reg_cub = np.geomspace(start=1e-8, stop=1e-2, num=7) * loss.hessian_lipschitz
     else:
         gd = GD_LS(loss=loss, label='GD LS')
-        cub_krylov = Cubic_LS(loss=loss, label='Cubic Newton LS (Krylov dim = {})'.format(memory_size),
-                              cubic_solver="krylov", solver_it_max=memory_size, tolerance = 1e-9)
-        cub_root = Cubic_LS(loss=loss, label='Cubic Newton LS',cubic_solver="root", tolerance = 1e-8)
+        cub_krylov = Cubic_Krylov_LS(loss=loss, label='Cubic Newton LS (Krylov dim = {})'.format(memory_size),
+                               subspace_dim=memory_size, tolerance = 1e-9)
+        cub_root = Cubic_LS(loss=loss, label='Cubic Newton LS', tolerance = 1e-8)
         sscn = SSCN(loss=loss, label='SSCN (subspace dim = {})'.format(memory_size),
-                               sub_dim=memory_size, tolerance = 1e-9)
+                               subspace_dim=memory_size, tolerance = 1e-9)
 
     # A benchmark algorithm that is used to compute the optimal solution
     adan = RegNewton(loss=loss, adaptive=True, use_line_search=True, 
