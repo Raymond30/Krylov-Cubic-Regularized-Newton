@@ -12,7 +12,7 @@ from optimizer.reg_newton import RegNewton
 
 if __name__ == '__main__':
     # Define the loss function
-    dataset = 'madelon'
+    dataset = 'w8a'
     # if dataset == 'mushrooms':
     #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
     #     data_path = './mushrooms'
@@ -33,12 +33,17 @@ if __name__ == '__main__':
     # l2 = 1e-10 * L # make the problem ill-conditioned
     # loss.l2 = l2
     x0 = np.ones(dim) * 0.5
+
+    flag_time = False # True for time, False for iteration
+
+    
     it_max = 200
+    time_max = 2000
 
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
 
-    memory_size = 10
+    memory_size = 2
     if not flag_LS:
         gd = Gd(loss=loss, label='GD')
         # grid search for lr
@@ -62,7 +67,7 @@ if __name__ == '__main__':
     
     # benchmark: SSCN
     print(f'Running optimizer: {sscn.label}')
-    sscn.run(x0=x0, it_max=it_max)
+    sscn.run(x0=x0, it_max=it_max, t_max=time_max)
     sscn.compute_loss_of_iterates()
     
     # Running algs
@@ -88,11 +93,11 @@ if __name__ == '__main__':
         # gd.trace.label = f'GD (lr={best_lr_gd})'
     else:
         print(f'Running optimizer: {gd.label}')
-        gd.run(x0=x0, it_max=it_max)
+        gd.run(x0=x0, it_max=it_max, t_max=time_max)
         gd.compute_loss_of_iterates()
 
     print(f'Running optimizer: {adan.label}')
-    adan.run(x0=x0, it_max=100)
+    adan.run(x0=x0, it_max=100,t_max=time_max)
     adan.compute_loss_of_iterates()
 
     # print(gd.trace.loss_vals)
@@ -144,18 +149,17 @@ if __name__ == '__main__':
 
     else:
         print(f'Running optimizer: {cub_krylov.label}')
-        cub_krylov.run(x0=x0, it_max=it_max)
+        cub_krylov.run(x0=x0, it_max=it_max, t_max=time_max)
         cub_krylov.compute_loss_of_iterates()
 
         print(f'Running optimizer: {cub_root.label}')
-        cub_root.run(x0=x0, it_max=it_max)
+        cub_root.run(x0=x0, it_max=it_max, t_max=time_max)
         cub_root.compute_loss_of_iterates()
 
 
 
 
     # Plot the loss curve
-    flag_time = True # True for time, False for iteration
     gd.trace.plot_losses(marker='^', time=flag_time)
     # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
@@ -173,5 +177,8 @@ if __name__ == '__main__':
     plt.yscale('log')
     plt.legend()
     plt.grid()
-    plt.savefig('figs/logistic.pdf')
+    if flag_time:
+        plt.savefig('figs/logistic_time.pdf')
+    else:
+        plt.savefig('figs/logistic_iteration.pdf')
     plt.show()
