@@ -12,7 +12,7 @@ from optimizer.reg_newton import RegNewton
 
 if __name__ == '__main__':
     # Define the loss function
-    dataset = 'w8a'
+    dataset = 'gisette_scale'
     # if dataset == 'mushrooms':
     #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
     #     data_path = './mushrooms'
@@ -20,7 +20,11 @@ if __name__ == '__main__':
     #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/w8a"
     #     data_path = './w8a'
     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/{}".format(dataset)
-    data_path = './{}'.format(dataset)
+
+    if dataset == 'gisette_scale' or 'duke':
+        data_path = './{}.bz2'.format(dataset)
+    else:
+        data_path = './{}'.format(dataset)
 
     f = urllib.request.urlretrieve(data_url, data_path)
     A, b = sklearn.datasets.load_svmlight_file(data_path)
@@ -35,10 +39,8 @@ if __name__ == '__main__':
     x0 = np.ones(dim) * 0.5
 
     flag_time = False # True for time, False for iteration
-
-    
-    it_max = 200
-    time_max = 2000
+    it_max = 100
+    time_max = 200
 
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
@@ -55,10 +57,10 @@ if __name__ == '__main__':
         reg_cub = np.geomspace(start=1e-8, stop=1e-2, num=7) * loss.hessian_lipschitz
     else:
         gd = GD_LS(loss=loss, label='GD LS')
-        cub_krylov = Cubic_Krylov_LS(loss=loss, label='Cubic Newton LS (Krylov dim = {})'.format(memory_size),
+        cub_krylov = Cubic_Krylov_LS(loss=loss, reg_coef = 1, label='Cubic Newton LS (Krylov dim = {})'.format(memory_size),
                                subspace_dim=memory_size, tolerance = 1e-9)
-        cub_root = Cubic_LS(loss=loss, label='Cubic Newton LS', tolerance = 1e-8)
-        sscn = SSCN(loss=loss, label='SSCN (subspace dim = {})'.format(memory_size),
+        cub_root = Cubic_LS(loss=loss, reg_coef = 1, label='Cubic Newton LS', tolerance = 1e-8)
+        sscn = SSCN(loss=loss, reg_coef = 1, label='SSCN (subspace dim = {})'.format(memory_size),
                                subspace_dim=memory_size, tolerance = 1e-9)
 
     # A benchmark algorithm that is used to compute the optimal solution
@@ -96,8 +98,9 @@ if __name__ == '__main__':
         gd.run(x0=x0, it_max=it_max, t_max=time_max)
         gd.compute_loss_of_iterates()
 
+    it_max_adan = 50
     print(f'Running optimizer: {adan.label}')
-    adan.run(x0=x0, it_max=100,t_max=time_max)
+    adan.run(x0=x0, it_max=it_max_adan,t_max=time_max)
     adan.compute_loss_of_iterates()
 
     # print(gd.trace.loss_vals)
