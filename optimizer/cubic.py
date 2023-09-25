@@ -3,7 +3,7 @@ import numpy.linalg as la
 import copy
 
 from scipy.optimize import root_scalar
-
+from scipy.linalg import eigh
 
 import random
 import os
@@ -419,6 +419,9 @@ class Cubic_Krylov_LS(Optimizer):
         self.r0 = r0_new
         
         self.solver_it += solver_it
+
+        # if model_decrease < 1e-6:
+        #     self.subspace_dim = 1
         # self.residuals.append(residual)
         # LS_end = time.time()
         # print('LS Time {time:.3f}'.format(time=LS_end - LS_start))
@@ -431,6 +434,108 @@ class Cubic_Krylov_LS(Optimizer):
         super(Cubic_Krylov_LS, self).update_trace()
         self.trace.solver_its.append(self.solver_it)
 
+
+## Test 
+
+class Cubic_Krylov_LS_test(Optimizer):
+    """
+    Krylov subspace cubic Newton method with line search
+    
+    Arguments:
+        
+    """
+    def __init__(self, reg_coef=None, subspace_dim=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
+        super(Cubic_Krylov_LS, self).__init__(*args, **kwargs)    
+        self.solver_it = 0
+        self.subspace_dim = subspace_dim
+        self.solver_eps = solver_eps
+
+        self.beta = beta
+        self.r0 = 0.1
+        # self.residuals = []
+        self.value = None
+
+        if reg_coef is None:
+            self.reg_coef = self.loss.hessian_lipschitz
+        else:
+            self.reg_coef = reg_coef
+        
+        # if cubic_solver == "GD": 
+        #     self.cubic_solver = ls_cubic_solver
+        # elif cubic_solver == "root":
+        #     self.cubic_solver = cubic_solver_root
+        # elif cubic_solver == "krylov":
+        #     self.cubic_solver = cubic_solver_krylov
+        # else:
+        #     print("Error: cubic_solver not recognized")
+
+        # if cubic_solver is None:
+        #     # self.cubic_solver = ls_cubic_solver
+        #     self.cubic_solver = cubic_solver_root
+        self.spectra = []
+
+    def step(self):
+        
+        if self.value is None:
+            self.value = self.loss.value(self.x)
+        
+        
+        self.grad = self.loss.gradient(self.x)
+
+
+        self.hess = self.hess(self.x)
+        h_eigs = eigh(self.hess, eigvals_only=True)
+        self.spectra.append(h_eigs)
+
+        # if self.cubic_solver is cubic_solver_krylov:    
+        self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
+            # krylov_start = time.time()
+        V, alphas, betas, beta = Lanczos(self.hess, self.grad, m=self.subspace_dim)
+            # krylov_end = time.time()
+            # print('Krylov Time {time:.3f}'.format(time=krylov_end - krylov_start))
+        self.hess = np.diag(alphas) + np.diag(betas, -1) + np.diag(betas, 1)
+
+        e1 = np.zeros(len(alphas))
+        e1[0] = 1
+        self.grad = np.linalg.norm(self.grad)*e1
+
+        if np.linalg.norm(self.grad) < self.tolerance:
+            return
+        # set the initial value of the regularization coefficient
+        reg_coef = self.reg_coef*self.beta
+
+        # LS_start = time.time()
+
+        s_new, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
+        reg_coef, epsilon = self.solver_eps, r0 = self.r0)
+        x_new = self.x + V @ s_new
+        value_new = self.loss.value(x_new)
+        while value_new > self.value - model_decrease:
+            reg_coef = reg_coef/self.beta
+            s_new, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
+            reg_coef, epsilon = self.solver_eps, r0 = self.r0)
+            x_new = self.x + V @ s_new
+            value_new = self.loss.value(x_new)
+        self.x = x_new
+        self.reg_coef = reg_coef
+        self.value = value_new
+        self.r0 = r0_new
+        
+        self.solver_it += solver_it
+
+        # if model_decrease < 1e-6:
+        #     self.subspace_dim = 1
+        # self.residuals.append(residual)
+        # LS_end = time.time()
+        # print('LS Time {time:.3f}'.format(time=LS_end - LS_start))
+        
+    def init_run(self, *args, **kwargs):
+        super(Cubic_Krylov_LS, self).init_run(*args, **kwargs)
+        self.trace.solver_its = [0]
+        
+    def update_trace(self):
+        super(Cubic_Krylov_LS, self).update_trace()
+        self.trace.solver_its.append(self.solver_it)
 
 class SSCN(Optimizer):
     """
@@ -479,14 +584,14 @@ class SSCN(Optimizer):
         x_new = copy.deepcopy(self.x)
         s_new_sub, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
         reg_coef, r0 = self.r0)
-        x_new[I] += s_new_sub
+        x_new[I] = self.x[I] + s_new_sub
         
         value_new = self.loss.value(x_new)
         while value_new > self.value - model_decrease:
             reg_coef = reg_coef/self.beta
             s_new_sub, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
             reg_coef, r0 = self.r0)
-            x_new[I] += s_new_sub
+            x_new[I] = self.x[I] + s_new_sub
             value_new = self.loss.value(x_new)
         self.x = x_new
         self.reg_coef = reg_coef
