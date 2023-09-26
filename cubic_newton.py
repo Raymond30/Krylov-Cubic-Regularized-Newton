@@ -1,5 +1,6 @@
 import sklearn.datasets
 import urllib.request
+import os.path
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +13,8 @@ from optimizer.reg_newton import RegNewton
 
 if __name__ == '__main__':
     # Define the loss function
-    dataset = 'gisette_scale'
+    # dataset = 'gisette_scale'
+    dataset = 'madelon'
     # if dataset == 'mushrooms':
     #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
     #     data_path = './mushrooms'
@@ -21,12 +23,12 @@ if __name__ == '__main__':
     #     data_path = './w8a'
     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/{}".format(dataset)
 
-    if dataset == 'gisette_scale' or 'duke':
+    if dataset == 'gisette_scale' or dataset == 'duke': # or dataset == 'epsilon_normalized':
         data_path = './{}.bz2'.format(dataset)
     else:
         data_path = './{}'.format(dataset)
-
-    f = urllib.request.urlretrieve(data_url, data_path)
+    if not os.path.exists(data_path):
+        f = urllib.request.urlretrieve(data_url, data_path)
     A, b = sklearn.datasets.load_svmlight_file(data_path)
     A = A.toarray()
 
@@ -38,9 +40,9 @@ if __name__ == '__main__':
     # loss.l2 = l2
     x0 = np.ones(dim) * 0.5
 
-    flag_time = False # True for time, False for iteration
-    it_max = 100
-    time_max = 200
+    flag_time = True # True for time, False for iteration
+    it_max = 5000000
+    time_max = 60
 
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
@@ -98,7 +100,7 @@ if __name__ == '__main__':
         gd.run(x0=x0, it_max=it_max, t_max=time_max)
         gd.compute_loss_of_iterates()
 
-    it_max_adan = 50
+    it_max_adan = 200
     print(f'Running optimizer: {adan.label}')
     adan.run(x0=x0, it_max=it_max_adan,t_max=time_max)
     adan.compute_loss_of_iterates()
@@ -181,7 +183,7 @@ if __name__ == '__main__':
     plt.legend()
     plt.grid()
     if flag_time:
-        plt.savefig('figs/logistic_time.pdf')
+        plt.savefig('figs/logistic_time_{}.pdf'.format(dataset))
     else:
-        plt.savefig('figs/logistic_iteration.pdf')
+        plt.savefig('figs/logistic_iteration_{}.pdf'.format(dataset))
     plt.show()
