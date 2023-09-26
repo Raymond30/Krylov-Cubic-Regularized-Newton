@@ -3,7 +3,7 @@ import numpy.linalg as la
 import copy
 
 from scipy.optimize import root_scalar
-from scipy.linalg import eigh
+from scipy.linalg import eigh, solve
 
 import random
 import os
@@ -91,13 +91,13 @@ def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
     id_matrix = np.eye(len(g))
 
     def func(lam):
-        s_lam = -np.linalg.solve(H + lam*id_matrix, g)
+        s_lam = -solve(H + lam*id_matrix, g, assume_a= 'pos')
         return lam**2 - M**2 * np.linalg.norm(s_lam)**2
     
     def grad(lam):
-        s_lam = -np.linalg.solve(H + lam*id_matrix, g)
-        phi_lam = np.linalg.norm(s_lam)**2
-        phi_lam_grad = -2*np.dot(s_lam,np.linalg.solve(H + lam*id_matrix, s_lam))
+        s_lam = -solve(H + lam*id_matrix, g, assume_a= 'pos')
+        # phi_lam = la.norm(s_lam)**2
+        phi_lam_grad = -2*np.dot(s_lam,solve(H + lam*id_matrix, s_lam, assume_a= 'pos'))
         return 2*lam - M**2 * phi_lam_grad
 
     # s_lam = lambda lam: -np.linalg.solve(H + lam*id_matrix, g)
@@ -107,8 +107,8 @@ def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
 
     sol = root_scalar(func, fprime=grad, x0 = r0, method='newton', maxiter=it_max, xtol=epsilon)
     r = sol.root
-    s = -np.linalg.solve(H + r*id_matrix, g)
-    norm_s = np.linalg.norm(s)
+    s = -solve(H + r*id_matrix, g, assume_a= 'pos')
+    norm_s = la.norm(s)
     model_decrease = r/2*norm_s**2-M/3*norm_s**3 - np.dot(g,s)/2
     return s, sol.iterations, r, model_decrease
 
@@ -396,8 +396,8 @@ class Cubic_Krylov_LS(Optimizer):
         e1[0] = 1
         self.grad = np.linalg.norm(self.grad)*e1
 
-        if np.linalg.norm(self.grad) < self.tolerance:
-            return
+        # if np.linalg.norm(self.grad) < self.tolerance:
+        #     return
         # set the initial value of the regularization coefficient
         reg_coef = self.reg_coef*self.beta
 
@@ -407,12 +407,16 @@ class Cubic_Krylov_LS(Optimizer):
         reg_coef, epsilon = self.solver_eps, r0 = self.r0)
         x_new = self.x + V @ s_new
         value_new = self.loss.value(x_new)
-        while value_new > self.value - model_decrease:
+
+        iter_count = 0
+        max_iter = 20
+        while value_new > self.value - model_decrease and iter_count < max_iter:
             reg_coef = reg_coef/self.beta
             s_new, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
             reg_coef, epsilon = self.solver_eps, r0 = self.r0)
             x_new = self.x + V @ s_new
             value_new = self.loss.value(x_new)
+            iter_count += 1
         self.x = x_new
         self.reg_coef = reg_coef
         self.value = value_new
@@ -578,7 +582,8 @@ class SSCN(Optimizer):
         # if np.linalg.norm(self.grad) < self.tolerance:
         #     return
         # set the initial value of the regularization coefficient
-        reg_coef = self.reg_coef*self.beta
+        reg_coef = max(self.reg_coef*self.beta, np.finfo(float).eps)
+
 
         # x_sub = self.x[I]
         x_new = copy.deepcopy(self.x)
