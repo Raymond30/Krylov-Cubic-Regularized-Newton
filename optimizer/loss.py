@@ -172,6 +172,7 @@ class LogisticRegression(Oracle):
     def __init__(self, A, b, store_mat_vec_prod=False, *args, **kwargs):
         super(LogisticRegression, self).__init__(*args, **kwargs)
         self.A = A
+        # self.AT = None
         b = np.asarray(b)
         b_unique = np.unique(b)
         # check that only two unique values exist in b
@@ -231,13 +232,16 @@ class LogisticRegression(Oracle):
         return grad
     
     def partial_gradient(self,x,I):
+        # if self.AT is None:
+        #     self.AT = self.A.T.copy()
         # I is an index set; return the gradient for the coordinates in I
         Ax = self.mat_vec_product(x)
         activation = scipy.special.expit(Ax)
+        # AT_sub = self.AT[I,:]
         if self.l2 == 0:
-            grad = self.A.T[I,:]@(activation-self.b)/self.n
+            grad = self.A.T[I,:] @ (activation-self.b)/self.n
         else:
-            grad = safe_sparse_add(self.A.T[I,:]@(activation-self.b)/self.n, self.l2*x[I])
+            grad = safe_sparse_add(self.A.T[I,:] @ (activation-self.b)/self.n, self.l2*x[I])
         if scipy.sparse.issparse(x):
             grad = scipy.sparse.csr_matrix(grad).T
         return grad
@@ -354,7 +358,24 @@ class LogisticRegression(Oracle):
         return self.A.T @ weighted_Av/self.n + self.l2*v
 
         # return safe_sparse_dot(self.hessian(x), v)
+    # def partial_hess_vec_prod(self, x, v, I, grad_dif=False, eps=None):
+    #     if self.AT is None:
+    #         self.AT = self.A.T.copy()
+    #     if grad_dif:
+    #         grad_x = self.gradient(x)
+    #         grad_x_v = self.gradient(x + eps * v)
+    #         return (grad_x_v - grad_x) / eps
         
+    #     Ax = self.mat_vec_product(x)
+    #     activation = scipy.special.expit(Ax)
+    #     weights = activation * (1-activation)
+
+    #     AT_sub = self.AT[I,:]
+    #     Av = AT_sub.T @ v
+
+    #     weighted_Av = np.multiply(weights, Av)
+    #     return AT_sub @ weighted_Av/self.n + self.l2*v
+    
     @property
     def smoothness(self):
         if self._smoothness is not None:
@@ -549,7 +570,8 @@ class LogSumExp(Oracle):
         return softmax
     
     def hess_vec_prod(self, x, v, grad_dif=False, eps=None):
-        pass
+        Ax = self.mat_vec_product(x)
+        softmax = self.softmax(x=x, Ax=Ax)
         
     @property
     def smoothness(self):
