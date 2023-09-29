@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from optimizer.loss import LogisticRegression
-from optimizer.cubic import Cubic, Cubic_LS, Cubic_Krylov_LS, SSCN
+from optimizer.cubic import Cubic, Cubic_LS, Cubic_Krylov_LS, Cubic_Stoch_Krylov_LS, SSCN
 from optimizer.GD import Gd, GD_LS
 from optimizer.reg_newton import RegNewton
 
@@ -14,7 +14,9 @@ from optimizer.reg_newton import RegNewton
 if __name__ == '__main__':
     # Define the loss function
     # dataset = 'gisette_scale'
-    dataset = 'madelon'
+    # dataset = 'madelon'
+    # dataset = 'rcv1_train.binary'
+    dataset = 'news20.binary'
     # if dataset == 'mushrooms':
     #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
     #     data_path = './mushrooms'
@@ -23,14 +25,14 @@ if __name__ == '__main__':
     #     data_path = './w8a'
     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/{}".format(dataset)
 
-    if dataset == 'gisette_scale' or dataset == 'duke': # or dataset == 'epsilon_normalized':
+    if dataset == 'gisette_scale' or dataset == 'duke' or dataset == 'rcv1_train.binary' or dataset == 'news20.binary': # or dataset == 'epsilon_normalized':
         data_path = './{}.bz2'.format(dataset)
     else:
         data_path = './{}'.format(dataset)
     if not os.path.exists(data_path):
         f = urllib.request.urlretrieve(data_url, data_path)
     A, b = sklearn.datasets.load_svmlight_file(data_path)
-    A = A.toarray()
+    # A = A.toarray()
 
     # Logistic regression problem
     loss = LogisticRegression(A, b, l1=0, l2=0, store_mat_vec_prod=True)
@@ -41,7 +43,7 @@ if __name__ == '__main__':
     x0 = np.ones(dim) * 0.5
 
     flag_time = True # True for time, False for iteration
-    it_max = 5000000
+    it_max = 500000
     time_max = 60
 
     # Define the optimization algs
@@ -61,6 +63,10 @@ if __name__ == '__main__':
         gd = GD_LS(loss=loss, label='GD LS')
         cub_krylov = Cubic_Krylov_LS(loss=loss, reg_coef = 1, label='Cubic Newton LS (Krylov dim = {})'.format(memory_size),
                                subspace_dim=memory_size, tolerance = 1e-9)
+        # cub_krylov = Cubic_Stoch_Krylov_LS(loss=loss, reg_coef = 1, label='Stochastic Cubic Newton LS (Krylov dim = {})'.format(memory_size),
+        #                     subsampling=memory_size, 
+        #                     subspace_dim=memory_size, tolerance = 1e-9)
+        
         cub_root = Cubic_LS(loss=loss, reg_coef = 1, label='Cubic Newton LS', tolerance = 1e-8)
         sscn = SSCN(loss=loss, reg_coef = 1, label='SSCN (subspace dim = {})'.format(memory_size),
                                subspace_dim=memory_size, tolerance = 1e-9)
@@ -69,6 +75,14 @@ if __name__ == '__main__':
     adan = RegNewton(loss=loss, adaptive=True, use_line_search=True, 
                      label='AdaN')
     
+    # print(f'Running optimizer: {cub_krylov.label}')
+    # cub_krylov.run(x0=x0, it_max=it_max, t_max=time_max)
+    # cub_krylov.compute_loss_of_iterates()
+
+    # print(f'Running optimizer: {cub_root.label}')
+    # cub_root.run(x0=x0, it_max=it_max, t_max=time_max)
+    # cub_root.compute_loss_of_iterates()
+
     # benchmark: SSCN
     print(f'Running optimizer: {sscn.label}')
     sscn.run(x0=x0, it_max=it_max, t_max=time_max)
@@ -100,10 +114,10 @@ if __name__ == '__main__':
         gd.run(x0=x0, it_max=it_max, t_max=time_max)
         gd.compute_loss_of_iterates()
 
-    it_max_adan = 200
-    print(f'Running optimizer: {adan.label}')
-    adan.run(x0=x0, it_max=it_max_adan,t_max=time_max)
-    adan.compute_loss_of_iterates()
+    # it_max_adan = 100
+    # print(f'Running optimizer: {adan.label}')
+    # adan.run(x0=x0, it_max=it_max_adan,t_max=time_max)
+    # adan.compute_loss_of_iterates()
 
     # print(gd.trace.loss_vals)
 
@@ -157,18 +171,19 @@ if __name__ == '__main__':
         cub_krylov.run(x0=x0, it_max=it_max, t_max=time_max)
         cub_krylov.compute_loss_of_iterates()
 
-        print(f'Running optimizer: {cub_root.label}')
-        cub_root.run(x0=x0, it_max=it_max, t_max=time_max)
-        cub_root.compute_loss_of_iterates()
+        # print(f'Running optimizer: {cub_root.label}')
+        # cub_root.run(x0=x0, it_max=it_max, t_max=time_max)
+        # cub_root.compute_loss_of_iterates()
 
 
 
 
     # Plot the loss curve
+    plt.style.use('tableau-colorblind10')
     gd.trace.plot_losses(marker='^', time=flag_time)
     # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
-    cub_root.trace.plot_losses(marker='s', time=flag_time)
+    # cub_root.trace.plot_losses(marker='s', time=flag_time)
     cub_krylov.trace.plot_losses(marker='d', time=flag_time)
 
     sscn.trace.plot_losses(marker='o', time=flag_time)
