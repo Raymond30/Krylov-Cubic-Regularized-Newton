@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from optimizer.loss import LogisticRegression
 from optimizer.cubic import Cubic, Cubic_LS, Cubic_Krylov_LS, Cubic_Stoch_Krylov_LS, SSCN
+from optimizer.LBFGS import Lbfgs
 from optimizer.GD import Gd, GD_LS
 from optimizer.reg_newton import RegNewton
 
@@ -15,8 +16,9 @@ if __name__ == '__main__':
     # Define the loss function
     # dataset = 'gisette_scale'
     # dataset = 'madelon'
-    # dataset = 'rcv1_train.binary'
-    dataset = 'news20.binary'
+    # dataset = 'w8a'
+    dataset = 'rcv1_train.binary'
+    # dataset = 'news20.binary'
     # if dataset == 'mushrooms':
     #     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/mushrooms"
     #     data_path = './mushrooms'
@@ -42,9 +44,9 @@ if __name__ == '__main__':
     # loss.l2 = l2
     x0 = np.ones(dim) * 0.5
 
-    flag_time = True # True for time, False for iteration
-    it_max = 500000
-    time_max = 60
+    flag_time = False # True for time, False for iteration
+    it_max = 50000
+    time_max = 30
 
     # Define the optimization algs
     flag_LS = True # True for LS, False for fixed learning rate/regularization parameter
@@ -75,6 +77,8 @@ if __name__ == '__main__':
     adan = RegNewton(loss=loss, adaptive=True, use_line_search=True, 
                      label='AdaN')
     
+    lbfgs = Lbfgs(loss=loss,mem_size=memory_size, label='LBFGS (m={})'.format(memory_size))
+    
     # print(f'Running optimizer: {cub_krylov.label}')
     # cub_krylov.run(x0=x0, it_max=it_max, t_max=time_max)
     # cub_krylov.compute_loss_of_iterates()
@@ -83,12 +87,19 @@ if __name__ == '__main__':
     # cub_root.run(x0=x0, it_max=it_max, t_max=time_max)
     # cub_root.compute_loss_of_iterates()
 
+    
+    # Running algs
+
     # benchmark: SSCN
     print(f'Running optimizer: {sscn.label}')
     sscn.run(x0=x0, it_max=it_max, t_max=time_max)
     sscn.compute_loss_of_iterates()
-    
-    # Running algs
+
+    # benchmark: SSCN
+    print(f'Running optimizer: {lbfgs.label}')
+    lbfgs.run(x0=x0, it_max=it_max, t_max=time_max)
+    lbfgs.compute_loss_of_iterates()
+
     if not flag_LS:
         best_loss_gd = np.inf
         best_lr_gd = None
@@ -183,10 +194,14 @@ if __name__ == '__main__':
     gd.trace.plot_losses(marker='^', time=flag_time)
     # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
-    # cub_root.trace.plot_losses(marker='s', time=flag_time)
+
     cub_krylov.trace.plot_losses(marker='d', time=flag_time)
 
     sscn.trace.plot_losses(marker='o', time=flag_time)
+
+    # cub_root.trace.plot_losses(marker='s', time=flag_time)
+
+    lbfgs.trace.plot_losses(marker='X', time=flag_time)
 
     # print(cub.trace.loss_vals)
     ## plt.xscale('log')
