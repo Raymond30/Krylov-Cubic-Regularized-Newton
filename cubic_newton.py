@@ -190,7 +190,9 @@ if __name__ == '__main__':
 
 
     # Plot the loss curve
-    plt.style.use('tableau-colorblind10')
+    # plt.style.use('tableau-colorblind10')
+
+    plt.style.use('seaborn-v0_8-colorblind')
     gd.trace.plot_losses(marker='^', time=flag_time)
     # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
     # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
