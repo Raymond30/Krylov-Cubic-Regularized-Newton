@@ -5,6 +5,9 @@ import copy
 from scipy.optimize import root_scalar
 from scipy.linalg import eigh, solve
 
+from scipy.sparse.linalg import cg, LinearOperator
+
+
 import random
 import os
 import time
@@ -255,7 +258,7 @@ class Cubic_LS(Optimizer):
     Arguments:
         reg_coef (float, optional): an estimate of the Hessian's Lipschitz constant
     """
-    def __init__(self, reg_coef=None, solver_it_max=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
+    def __init__(self, reg_coef=None, cubic_solver="CG", solver_it_max=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
         super(Cubic_LS, self).__init__(*args, **kwargs)
         self.solver_it = 0
         self.solver_it_max = solver_it_max
@@ -270,6 +273,13 @@ class Cubic_LS(Optimizer):
             self.reg_coef = self.loss.hessian_lipschitz
         else:
             self.reg_coef = reg_coef
+        
+        if cubic_solver == "CG":
+            self.cubic_solver = self.cubic_solver_root_CG
+        elif cubic_solver == "full":
+            self.cubic_solver = self.cubic_solver_root_full
+        else:
+            print("Error: cubic_solver not recognized")
         # if cubic_solver == "GD": 
         #     self.cubic_solver = ls_cubic_solver
         # elif cubic_solver == "root":
@@ -282,6 +292,54 @@ class Cubic_LS(Optimizer):
         #     # self.cubic_solver = ls_cubic_solver
         #     self.cubic_solver = cubic_solver_root
     
+    def cubic_solver_root_CG(self, M, it_max=100, epsilon=1e-8, r0 = 0.1):
+        g = self.grad
+        def func(lam):
+            # s_lam = -solve(H + lam*id_matrix, g, assume_a= 'pos')
+            def mv(v):
+                return self.loss.hess_vec_prod(self.x,v) + lam*v
+            H_lambda = LinearOperator(shape =(len(g),len(g)), matvec=mv)
+            s_lam, exit_code = cg(H_lambda, -g, tol=epsilon)
+            # s_lam = -s_lam
+            return lam**2 - M**2 * np.linalg.norm(s_lam)**2
+        
+        def grad(lam):
+            # s_lam = -solve(H + lam*id_matrix, g, assume_a= 'pos')
+            # phi_lam = la.norm(s_lam)**2
+            def mv(v):
+                return self.loss.hess_vec_prod(self.x,v) + lam*v
+            H_lambda = LinearOperator(shape =(len(g),len(g)), matvec=mv)
+            s_lam, exit_code = cg(H_lambda, -g, tol=epsilon)
+            # s_lam = -s_lam
+            # phi_lam_grad = -2*np.dot(s_lam, self.loss.hess_solve(self.x, s_lam, lam))
+            Hinv_s_lam, exit_code = cg(H_lambda, s_lam, tol=epsilon)
+            phi_lam_grad = -2*np.dot(s_lam, Hinv_s_lam)
+            return 2*lam - M**2 * phi_lam_grad
+
+        # s_lam = lambda lam: -np.linalg.solve(H + lam*id_matrix, g)
+        # phi_lam = lambda lam: np.la.norm(s_lam(lam))^2
+        # phi_lam_grad = lambda lam: -2*s_lam(lam)*np.linalg.solve(H + lam*id_matrix, s_lam(lam))
+        # func = lambda r: np.la.norm(np.la.solve(H + M*r*id_matrix, g)) - r
+
+        sol = root_scalar(func, fprime=grad, x0 = r0, method='newton', maxiter=it_max, xtol=epsilon)
+        r = sol.root
+        # s = -solve(H + r*id_matrix, g, assume_a= 'pos')
+
+        def mv(v):
+            return self.loss.hess_vec_prod(self.x,v) + r*v
+        H_lambda = LinearOperator(shape =(len(g),len(g)), matvec=mv)
+        # s = -self.loss.hess_solve(self.x, g, r)
+        s, exit_code = cg(H_lambda, -g, tol=epsilon)
+        # s = -s
+        norm_s = la.norm(s)
+        model_decrease = r/2*norm_s**2-M/3*norm_s**3 - np.dot(g,s)/2
+        return s, sol.iterations, r, model_decrease
+    
+    def cubic_solver_root_full(self, M, it_max=100, epsilon=1e-8, r0 = 0.1):
+        g = self.grad
+        # id_matrix = np.eye(len(g))
+        H = self.hess
+        return cubic_solver_root(g, H, M, it_max=it_max, epsilon=epsilon, r0=r0)
     
     def step(self):
 
@@ -289,6 +347,9 @@ class Cubic_LS(Optimizer):
             self.value = self.loss.value(self.x)
         
         self.grad = self.loss.gradient(self.x)
+
+        if self.cubic_solver == self.cubic_solver_root_full:
+            self.hess = self.loss.hessian(self.x)
 
         # if self.cubic_solver is cubic_solver_krylov:    
         # self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
@@ -302,7 +363,7 @@ class Cubic_LS(Optimizer):
         # e1[0] = 1
         # self.grad = np.linalg.norm(self.grad)*e1
             
-        self.hess = self.loss.hessian(self.x)
+        # self.hess = self.loss.hessian(self.x)
 
         if np.linalg.norm(self.grad) < self.tolerance:
             return
@@ -311,13 +372,14 @@ class Cubic_LS(Optimizer):
 
         # LS_start = time.time()
 
-        s_new, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
+        s_new, solver_it, r0_new, model_decrease = self.cubic_solver( 
         reg_coef, self.solver_it_max, self.solver_eps, r0 = self.r0)
+
         x_new = self.x + s_new
         value_new = self.loss.value(x_new)
         while value_new > self.value - model_decrease:
             reg_coef = reg_coef/self.beta
-            s_new, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
+            s_new, solver_it, r0_new, model_decrease = self.cubic_solver( 
             reg_coef, self.solver_it_max, self.solver_eps, r0 = self.r0)
             x_new = self.x + s_new
             value_new = self.loss.value(x_new)
