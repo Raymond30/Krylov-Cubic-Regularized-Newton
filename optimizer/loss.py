@@ -3,6 +3,9 @@ import numpy as np
 import warnings
 import scipy
 
+# from scipy.linalg import eigh, solve
+# from scipy.sparse.linalg import spsolve
+
 import scipy.special
 import numpy as np
 import warnings
@@ -11,6 +14,8 @@ from numba import njit
 from sklearn.utils.extmath import row_norms, safe_sparse_dot
 
 from optimizer.utils import safe_sparse_add, safe_sparse_multiply, safe_sparse_norm, safe_sparse_inner_prod
+
+# import time
 
 class Oracle():
     """
@@ -376,6 +381,36 @@ class LogisticRegression(Oracle):
     #     weighted_Av = np.multiply(weights, Av)
     #     return AT_sub @ weighted_Av/self.n + self.l2*v
     
+    # def hess_solve(self, x, v, lam):
+    #     # Return (H+lam I)^{-1} v
+    #     Ax = self.mat_vec_product(x)
+    #     activation = scipy.special.expit(Ax)
+    #     weights = activation * (1-activation)
+
+    #     if self.n < self.dim:
+    #         # Use Woodbury matrix identity
+    #         # H = A^T diag(weights)/n A + l2*I
+    #         # (H + lam I)^{-1} = 
+    #         # (lam')^{-1} - (lam')^{-2} A_scaled^T (I + A_scaled A_scaled^T/lam')^-1 A_scaled
+    #         lam_equiv = lam + self.l2
+    #         # AT_scaled = safe_sparse_multiply(self.A.T, np.sqrt(weights/self.n))
+    #         AT_scaled = self.A.T.multiply(np.sqrt(weights/self.n)) 
+    #         Av_scaled = AT_scaled.T @ v
+    #         AAT = AT_scaled.T @ AT_scaled
+
+    #         start = time.time()
+    #         sol = spsolve(scipy.sparse.eye(self.n) + AAT/lam_equiv, Av_scaled)
+    #         print("LS Solving time:{}".format(time.time()-start))
+    #         sol = AT_scaled @ sol
+    #         sol = v / lam_equiv - sol/ lam_equiv**2
+    #         return sol
+    #     else:
+    #         return solve(self.hessian(x)+lam*np.eye(self.dim), v)
+
+            
+
+
+
     @property
     def smoothness(self):
         if self._smoothness is not None:
