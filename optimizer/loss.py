@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import warnings
 import scipy
+from scipy import sparse 
 
 # from scipy.linalg import eigh, solve
 # from scipy.sparse.linalg import spsolve
@@ -15,7 +16,7 @@ from sklearn.utils.extmath import row_norms, safe_sparse_dot
 
 from optimizer.utils import safe_sparse_add, safe_sparse_multiply, safe_sparse_norm, safe_sparse_inner_prod
 
-# import time
+import time
 
 class Oracle():
     """
@@ -198,6 +199,7 @@ class LogisticRegression(Oracle):
                 # replace class labels with 0's and 1's
                 self.b = 1. * (b == b[0])
         self.store_mat_vec_prod = store_mat_vec_prod
+        self.reuse = False
         
         self.n, self.dim = A.shape
         self.x_last = 0.
@@ -240,13 +242,21 @@ class LogisticRegression(Oracle):
         # if self.AT is None:
         #     self.AT = self.A.T.copy()
         # I is an index set; return the gradient for the coordinates in I
+
+        time_start = time.time()
         Ax = self.mat_vec_product(x)
+        # print('Ax time: {}'.format(time.time()-time_start))
+
+        time_start = time.time()
         activation = scipy.special.expit(Ax)
+        # print('Activation time: {}'.format(time.time()-time_start))
         # AT_sub = self.AT[I,:]
         if self.l2 == 0:
-            grad = self.A.T[I,:] @ (activation-self.b)/self.n
+            time_start = time.time()
+            grad = self.A[:,I].T @ (activation-self.b)/self.n
+            # print('grad time: {}'.format(time.time()-time_start))
         else:
-            grad = safe_sparse_add(self.A.T[I,:] @ (activation-self.b)/self.n, self.l2*x[I])
+            grad = safe_sparse_add(self.A[:,I].T @ (activation-self.b)/self.n, self.l2*x[I])
         if scipy.sparse.issparse(x):
             grad = scipy.sparse.csr_matrix(grad).T
         return grad
@@ -294,16 +304,22 @@ class LogisticRegression(Oracle):
         Ax = self.mat_vec_product(x)
         activation = scipy.special.expit(Ax)
         weights = activation * (1-activation)
-        A_weighted = safe_sparse_multiply(self.A.T, weights)
+        # A_weighted = safe_sparse_multiply(self.A.T, weights)
+        A_weighted = self.A.T.multiply(weights)
         return A_weighted@self.A/self.n + self.l2*np.eye(self.dim)
     
     def partial_hessian(self, x, I):
+        time_start = time.time()
         Ax = self.mat_vec_product(x)
+        # print('Ax time: {}'.format(time.time()-time_start))
         activation = scipy.special.expit(Ax)
         weights = activation * (1-activation)
-        A_weighted = safe_sparse_multiply(self.A.T[I,:], weights)
+        time_start = time.time()
+        # A_weighted = safe_sparse_multiply(self.A[:,I].T, weights)
+        A_weighted = self.A[:,I].T.multiply(weights) 
+        # print('A_weighted time: {}'.format(time.time()-time_start))
         dim = len(I)
-        return A_weighted@self.A[:,I]/self.n + self.l2*np.eye(dim)
+        return A_weighted@self.A[:,I]/self.n + self.l2*sparse.eye(dim)
     
     # def stochastic_hessian(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
     #                        rng=None, return_idx=False):
@@ -328,7 +344,7 @@ class LogisticRegression(Oracle):
     #     return hess
     
     def mat_vec_product(self, x):
-        if self.store_mat_vec_prod and self.is_equal(x, self.x_last):
+        if self.store_mat_vec_prod and (self.reuse or self.is_equal(x, self.x_last)):
             return self._mat_vec_prod
 
         Ax = self.A @ x
@@ -340,6 +356,15 @@ class LogisticRegression(Oracle):
             self.x_last = x.copy()
         return Ax
     
+    def update_mat_vec_product(self, Ax, delta, I):
+       self._mat_vec_prod = Ax + self.A[:,I] @ delta
+       self.reuse = True
+
+    def reset(self):
+        self.reuse = False
+        self.x_last = 0.
+        self._mat_vec_prod = np.zeros(self.n)
+
     # def hess_vec_prod(self, x, v, grad_dif=False, eps=None):
     #     if grad_dif:
     #         grad_x = self.gradient(x)
