@@ -27,7 +27,7 @@ if __name__ == '__main__':
     #     data_path = './w8a'
     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/{}".format(dataset)
 
-    if dataset == 'gisette_scale' or dataset == 'duke' or dataset == 'rcv1_train.binary' or dataset == 'news20.binary': # or dataset == 'epsilon_normalized':
+    if dataset in {'gisette_scale','duke','rcv1_train.binary','news20.binary'}: # or dataset == 'epsilon_normalized':
         data_path = './{}.bz2'.format(dataset)
     else:
         data_path = './{}'.format(dataset)
