@@ -157,6 +157,7 @@ class Optimizer:
             self.trace.lrs.append(self.line_search.lr)
             
     def compute_loss_of_iterates(self):
+        self.loss.reset()
         self.trace.compute_loss_of_iterates()
         
     def reset(self, loss):
