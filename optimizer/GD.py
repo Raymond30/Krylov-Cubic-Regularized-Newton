@@ -1,5 +1,6 @@
 from optimizer.optimizer import Optimizer
 import numpy as np
+import time 
 
 class Gd(Optimizer):
     """
@@ -44,7 +45,11 @@ class GD_LS(Optimizer):
         if self.value is None:
             self.value = self.loss.value(self.x)
         
+        grad_start = time.time()
         self.grad = self.loss.gradient(self.x)
+        grad_end = time.time()
+        # print('Grad time: {}'.format(grad_end-grad_start))
+
         lr = self.lr/self.beta
         x_new = self.x - lr * self.grad
         value_new = self.loss.value(x_new)
