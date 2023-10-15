@@ -3,9 +3,10 @@ import numpy.linalg as la
 import copy
 
 from scipy.optimize import root_scalar
-from scipy.linalg import eigh, solve
+from scipy.linalg import eigh, solve 
 
-from scipy.sparse.linalg import cg, LinearOperator
+from scipy import sparse
+from scipy.sparse.linalg import cg, LinearOperator, spsolve
 
 
 import random
@@ -91,16 +92,21 @@ def ls_cubic_solver(x, g, H, M, it_max=100, epsilon=1e-8, loss=None):
 
 
 def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
-    id_matrix = np.eye(len(g))
+    if sparse.issparse(H):
+        id_matrix = sparse.eye(len(g))
+        lp_solve = lambda A,b : spsolve(A,b)
+    else:
+        id_matrix = np.eye(len(g))
+        lp_solve = lambda A,b: solve(A,b, assume_a= 'pos')
 
     def func(lam):
-        s_lam = -solve(H + lam*id_matrix, g, assume_a= 'pos')
+        s_lam = -lp_solve(H + lam*id_matrix, g)
         return lam**2 - M**2 * np.linalg.norm(s_lam)**2
     
     def grad(lam):
-        s_lam = -solve(H + lam*id_matrix, g, assume_a= 'pos')
+        s_lam = -lp_solve(H + lam*id_matrix, g)
         # phi_lam = la.norm(s_lam)**2
-        phi_lam_grad = -2*np.dot(s_lam,solve(H + lam*id_matrix, s_lam, assume_a= 'pos'))
+        phi_lam_grad = -2*np.dot(s_lam,lp_solve(H + lam*id_matrix, s_lam))
         return 2*lam - M**2 * phi_lam_grad
 
     # s_lam = lambda lam: -np.linalg.solve(H + lam*id_matrix, g)
@@ -110,7 +116,7 @@ def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
 
     sol = root_scalar(func, fprime=grad, x0 = r0, method='newton', maxiter=it_max, xtol=epsilon)
     r = sol.root
-    s = -solve(H + r*id_matrix, g, assume_a= 'pos')
+    s = -lp_solve(H + r*id_matrix, g)
     norm_s = la.norm(s)
     model_decrease = r/2*norm_s**2-M/3*norm_s**3 - np.dot(g,s)/2
     return s, sol.iterations, r, model_decrease
@@ -242,6 +248,7 @@ class Cubic(Optimizer):
     def init_run(self, *args, **kwargs):
         super(Cubic, self).init_run(*args, **kwargs)
         self.trace.solver_its = [0]
+        self.loss.reset()
         
     def update_trace(self):
         super(Cubic, self).update_trace()
@@ -396,6 +403,7 @@ class Cubic_LS(Optimizer):
     def init_run(self, *args, **kwargs):
         super(Cubic_LS, self).init_run(*args, **kwargs)
         self.trace.solver_its = [0]
+        self.loss.reset()
         
     def update_trace(self):
         super(Cubic_LS, self).update_trace()
@@ -444,14 +452,17 @@ class Cubic_Krylov_LS(Optimizer):
         if self.value is None:
             self.value = self.loss.value(self.x)
         
+        time_start = time.time()
         self.grad = self.loss.gradient(self.x)
+        # print('Grad time: {:.3f}'.format(time.time()-time_start))
 
         # if self.cubic_solver is cubic_solver_krylov:    
         self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
-            # krylov_start = time.time()
+        krylov_start = time.time()
         V, alphas, betas, beta = Lanczos(self.hess, self.grad, m=self.subspace_dim)
-            # krylov_end = time.time()
-            # print('Krylov Time {time:.3f}'.format(time=krylov_end - krylov_start))
+        krylov_end = time.time()
+        # print('Krylov Time {time:.3f}'.format(time=krylov_end - krylov_start))
+
         self.hess = np.diag(alphas) + np.diag(betas, -1) + np.diag(betas, 1)
 
         e1 = np.zeros(len(alphas))
@@ -486,6 +497,7 @@ class Cubic_Krylov_LS(Optimizer):
         
         self.solver_it += solver_it
 
+        # print('Iteration time: {:.3f}'.format(time.time()-time_start))
         # if model_decrease < 1e-6:
         #     self.subspace_dim = 1
         # self.residuals.append(residual)
@@ -495,6 +507,7 @@ class Cubic_Krylov_LS(Optimizer):
     def init_run(self, *args, **kwargs):
         super(Cubic_Krylov_LS, self).init_run(*args, **kwargs)
         self.trace.solver_its = [0]
+        self.loss.reset()
         
     def update_trace(self):
         super(Cubic_Krylov_LS, self).update_trace()
@@ -599,6 +612,7 @@ class Cubic_Stoch_Krylov_LS(Optimizer):
     def init_run(self, *args, **kwargs):
         super(Cubic_Stoch_Krylov_LS, self).init_run(*args, **kwargs)
         self.trace.solver_its = [0]
+        self.loss.reset()
         
     def update_trace(self):
         super(Cubic_Stoch_Krylov_LS, self).update_trace()
@@ -701,6 +715,7 @@ class Cubic_Krylov_LS_test(Optimizer):
     def init_run(self, *args, **kwargs):
         super(Cubic_Krylov_LS, self).init_run(*args, **kwargs)
         self.trace.solver_its = [0]
+        self.loss.reset()
         
     def update_trace(self):
         super(Cubic_Krylov_LS, self).update_trace()
@@ -731,7 +746,8 @@ class SSCN(Optimizer):
 
         if reg_coef is None:
             self.reg_coef = self.loss.hessian_lipschitz
-    
+
+        self.reuse = False
     
     def step(self):
         if self.value is None:
@@ -741,8 +757,16 @@ class SSCN(Optimizer):
         I = self.rng.choice(self.dim, size=self.subspace_dim, replace=False)
         
         # partial derivative information
+
+        grad_start = time.time()
         self.grad = self.loss.partial_gradient(self.x, I)
+        grad_end = time.time()
+        # print('Gradient time: {}'.format(grad_end-grad_start))
+
+        hess_start = time.time()
         self.hess = self.loss.partial_hessian(self.x, I)
+        hess_end = time.time()
+        # print('Hessian time: {}'.format(hess_end-hess_start))
 
         # if np.linalg.norm(self.grad) < self.tolerance:
         #     return
@@ -752,21 +776,31 @@ class SSCN(Optimizer):
 
         # x_sub = self.x[I]
         x_new = copy.deepcopy(self.x)
+        Ax = copy.deepcopy(self.loss._mat_vec_prod)
+
+        time_start = time.time()
         s_new_sub, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
-        reg_coef, r0 = self.r0)
+        reg_coef, r0 = self.r0, epsilon=np.finfo(float).eps)
         x_new[I] = self.x[I] + s_new_sub
+        # print('Cubic solving time: {}'.format(time.time()-time_start))
+
+        self.loss.update_mat_vec_product(Ax, s_new_sub, I)
         
         value_new = self.loss.value(x_new)
         while value_new > self.value - model_decrease:
             reg_coef = reg_coef/self.beta
             s_new_sub, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
-            reg_coef, r0 = self.r0)
+            reg_coef, r0 = self.r0, epsilon=np.finfo(float).eps)
             x_new[I] = self.x[I] + s_new_sub
+
+            self.loss.update_mat_vec_product(Ax, s_new_sub, I)
             value_new = self.loss.value(x_new)
         self.x = x_new
         self.reg_coef = reg_coef
         self.value = value_new
         self.r0 = r0_new
+
+        
         
         self.solver_it += solver_it
         # self.residuals.append(residual)
@@ -774,6 +808,7 @@ class SSCN(Optimizer):
     def init_run(self, *args, **kwargs):
         super(SSCN, self).init_run(*args, **kwargs)
         self.trace.solver_its = [0]
+        self.loss.reset()
         
     def update_trace(self):
         super(SSCN, self).update_trace()
