@@ -92,9 +92,15 @@ def ls_cubic_solver(x, g, H, M, it_max=100, epsilon=1e-8, loss=None):
 
 
 def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
+
     if sparse.issparse(H):
-        id_matrix = sparse.eye(len(g))
-        lp_solve = lambda A,b : spsolve(A,b)
+        if len(g) <= 500:
+            H = H.toarray()
+            id_matrix = np.eye(len(g))
+            lp_solve = lambda A,b: solve(A,b, assume_a= 'pos')
+        else:
+            id_matrix = sparse.eye(len(g))
+            lp_solve = lambda A,b : spsolve(A,b)
     else:
         id_matrix = np.eye(len(g))
         lp_solve = lambda A,b: solve(A,b, assume_a= 'pos')
