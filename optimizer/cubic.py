@@ -418,7 +418,7 @@ class Cubic_LS(Optimizer):
 
 class Cubic_Krylov_LS(Optimizer):
     """
-    Krylov subspace cubic Newton method with line search
+    Krylov cubic Newton method with line search
     
     Arguments:
         
