@@ -41,10 +41,11 @@ def safe_sparse_inner_prod(a, b):
 
 
 def safe_sparse_multiply(a, b):
-    if scipy.sparse.issparse(a) and scipy.sparse.issparse(b):
-        return a.multiply(b)
+    # if scipy.sparse.issparse(a) and scipy.sparse.issparse(b):
+    #     return a.multiply(b)
     if scipy.sparse.issparse(a):
-        a = a.toarray()
+        # a = a.toarray()
+        return a.multiply(b)
     elif scipy.sparse.issparse(b):
         b = b.toarray()
     return np.multiply(a, b)

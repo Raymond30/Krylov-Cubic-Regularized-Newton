@@ -4,9 +4,6 @@ import warnings
 import scipy
 from scipy import sparse 
 
-# from scipy.linalg import eigh, solve
-# from scipy.sparse.linalg import spsolve
-
 import scipy.special
 import numpy as np
 import warnings
@@ -178,7 +175,6 @@ class LogisticRegression(Oracle):
     def __init__(self, A, b, store_mat_vec_prod=False, *args, **kwargs):
         super(LogisticRegression, self).__init__(*args, **kwargs)
         self.A = A
-        # self.AT = None
         b = np.asarray(b)
         b_unique = np.unique(b)
         # check that only two unique values exist in b
@@ -212,20 +208,6 @@ class LogisticRegression(Oracle):
             regularization = self.l2 / 2 * safe_sparse_norm(x)**2
         return np.mean(safe_sparse_multiply(1-self.b, Ax)-logsig(Ax)) + regularization
     
-    # def partial_value(self, x, idx, include_reg=True, normalization=None, return_idx=False):
-    #     batch_size = 1 if np.isscalar(idx) else len(idx)
-    #     if normalization is None:
-    #         normalization = batch_size
-    #     Ax = self.A[idx] @ x
-    #     if scipy.sparse.issparse(Ax):
-    #         Ax = Ax.toarray().ravel()
-    #     regularization = 0
-    #     if include_reg:
-    #         regularization = self.l2 / 2 * safe_sparse_norm(x)**2
-    #     value = np.sum(safe_sparse_multiply(1-self.b[idx], Ax)-logsig(Ax))/normalization + regularization
-    #     if return_idx:
-    #         return (value, idx)
-    #     return value
     
     def gradient(self, x):
         Ax = self.mat_vec_product(x)
@@ -239,20 +221,18 @@ class LogisticRegression(Oracle):
         return grad
     
     def partial_gradient(self,x,I):
-        # if self.AT is None:
-        #     self.AT = self.A.T.copy()
-        # I is an index set; return the gradient for the coordinates in I
-
-        time_start = time.time()
+        """
+        Return the partial gradient at x with indices in I
+        """
+        # time_start = time.time()
         Ax = self.mat_vec_product(x)
         # print('Ax time: {}'.format(time.time()-time_start))
 
-        time_start = time.time()
+        # time_start = time.time()
         activation = scipy.special.expit(Ax)
         # print('Activation time: {}'.format(time.time()-time_start))
-        # AT_sub = self.AT[I,:]
         if self.l2 == 0:
-            time_start = time.time()
+            # time_start = time.time()
             grad = self.A[:,I].T @ (activation-self.b)/self.n
             # print('grad time: {}'.format(time.time()-time_start))
         else:
@@ -304,19 +284,19 @@ class LogisticRegression(Oracle):
         Ax = self.mat_vec_product(x)
         activation = scipy.special.expit(Ax)
         weights = activation * (1-activation)
-        # A_weighted = safe_sparse_multiply(self.A.T, weights)
-        A_weighted = self.A.T.multiply(weights)
+        A_weighted = safe_sparse_multiply(self.A.T, weights)
+        # A_weighted = self.A.T.multiply(weights)
         return A_weighted@self.A/self.n + self.l2*np.eye(self.dim)
     
     def partial_hessian(self, x, I):
-        time_start = time.time()
+        # time_start = time.time()
         Ax = self.mat_vec_product(x)
         # print('Ax time: {}'.format(time.time()-time_start))
         activation = scipy.special.expit(Ax)
         weights = activation * (1-activation)
-        time_start = time.time()
-        # A_weighted = safe_sparse_multiply(self.A[:,I].T, weights)
-        A_weighted = self.A[:,I].T.multiply(weights) 
+        # time_start = time.time()
+        A_weighted = safe_sparse_multiply(self.A[:,I].T, weights)
+        # A_weighted = self.A[:,I].T.multiply(weights) 
         # print('A_weighted time: {}'.format(time.time()-time_start))
         dim = len(I)
         return A_weighted@self.A[:,I]/self.n + self.l2*sparse.eye(dim)
@@ -365,12 +345,6 @@ class LogisticRegression(Oracle):
         self.x_last = 0.
         self._mat_vec_prod = np.zeros(self.n)
 
-    # def hess_vec_prod(self, x, v, grad_dif=False, eps=None):
-    #     if grad_dif:
-    #         grad_x = self.gradient(x)
-    #         grad_x_v = self.gradient(x + eps * v)
-    #         return (grad_x_v - grad_x) / eps
-    #     return safe_sparse_dot(self.hessian(x), v)
 
     def hess_vec_prod(self, x, v, grad_dif=False, eps=None):
         if grad_dif:
@@ -386,51 +360,6 @@ class LogisticRegression(Oracle):
 
         weighted_Av = np.multiply(weights, Av)
         return self.A.T @ weighted_Av/self.n + self.l2*v
-
-        # return safe_sparse_dot(self.hessian(x), v)
-    # def partial_hess_vec_prod(self, x, v, I, grad_dif=False, eps=None):
-    #     if self.AT is None:
-    #         self.AT = self.A.T.copy()
-    #     if grad_dif:
-    #         grad_x = self.gradient(x)
-    #         grad_x_v = self.gradient(x + eps * v)
-    #         return (grad_x_v - grad_x) / eps
-        
-    #     Ax = self.mat_vec_product(x)
-    #     activation = scipy.special.expit(Ax)
-    #     weights = activation * (1-activation)
-
-    #     AT_sub = self.AT[I,:]
-    #     Av = AT_sub.T @ v
-
-    #     weighted_Av = np.multiply(weights, Av)
-    #     return AT_sub @ weighted_Av/self.n + self.l2*v
-    
-    # def hess_solve(self, x, v, lam):
-    #     # Return (H+lam I)^{-1} v
-    #     Ax = self.mat_vec_product(x)
-    #     activation = scipy.special.expit(Ax)
-    #     weights = activation * (1-activation)
-
-    #     if self.n < self.dim:
-    #         # Use Woodbury matrix identity
-    #         # H = A^T diag(weights)/n A + l2*I
-    #         # (H + lam I)^{-1} = 
-    #         # (lam')^{-1} - (lam')^{-2} A_scaled^T (I + A_scaled A_scaled^T/lam')^-1 A_scaled
-    #         lam_equiv = lam + self.l2
-    #         # AT_scaled = safe_sparse_multiply(self.A.T, np.sqrt(weights/self.n))
-    #         AT_scaled = self.A.T.multiply(np.sqrt(weights/self.n)) 
-    #         Av_scaled = AT_scaled.T @ v
-    #         AAT = AT_scaled.T @ AT_scaled
-
-    #         start = time.time()
-    #         sol = spsolve(scipy.sparse.eye(self.n) + AAT/lam_equiv, Av_scaled)
-    #         print("LS Solving time:{}".format(time.time()-start))
-    #         sol = AT_scaled @ sol
-    #         sol = v / lam_equiv - sol/ lam_equiv**2
-    #         return sol
-    #     else:
-    #         return solve(self.hessian(x)+lam*np.eye(self.dim), v)
 
             
 
