@@ -7,5 +7,8 @@ To reproduce the plots on the "w8a" dataset (the first subfigures in Figures 2 a
 python cubic_newton.py --time --it_max 50000 --time_max 60
 python cubic_newton.py --it_max 50 --time_max 60000
 ```
+
+To reproduce the plots on the "rcv1_train" and the "news20" datasets, run the Jupyter notebook "cubic_newton.ipynb".
+
 ## Acknowledgment
 Our implementation is partially based on the code by XXX (We will deanonymize the link and include the proper license if the submission is accepted). 
