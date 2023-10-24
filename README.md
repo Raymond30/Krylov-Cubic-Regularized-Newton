@@ -1,13 +1,14 @@
-# Krylov subspace Newton Method
+# Krylov Cubic Regularized Newton: A Subspace Second-Order Method with Dimension-Free Convergence Rate
 
-This repository implements Krylov subspace cubic Newton method ([Overleaf document](https://www.overleaf.com/5933328532vkddhzzkhkjb)). 
+This repository implements the Krylov cubic regularized Newton method.   
 ## How to run
-To run the algorithms and produce the plots, run "cubic_newton.py": 
+To reproduce the plots on the "w8a" dataset (the first subfigures in Figures 2 and 3), run "cubic_newton.py": 
 ```
-python cubic_newton.py
+python cubic_newton.py --time --it_max 50000 --time_max 60
+python cubic_newton.py --it_max 50 --time_max 60000
 ```
-## File structure
-- Under "optimizer": Implementations of loss functions and optimziation algorithms. They are adapted from https://github.com/konstmish/opt_methods
-- [cubic_newton.ipynb](cubic_newton.ipynb): the jupyter notebook version of "python cubic_newton.py", for quick debugging and exploration. 
-- [Lanczos.ipynb](Lanczos.ipynb): the jupyter notebook for implementing Lanczos method. 
-- [newton.ipynb](newton.ipynb): the regularized Newton method from https://github.com/konstmish/global-newton
+
+To reproduce the plots on the "rcv1_train" and the "news20" datasets (the other subfigures in Figures 2 and 3), run the Jupyter notebook "cubic_newton.ipynb".
+
+## Acknowledgment
+Our implementation is partially based on the code by XXX (We will deanonymize the link and include the proper license if the submission is accepted). 
