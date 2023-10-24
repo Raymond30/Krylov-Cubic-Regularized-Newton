@@ -100,7 +100,7 @@ def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
     """
     if sparse.issparse(H):
         # when the dimension is small, convert H to a dense matrix
-        if len(g) <= 500:
+        if len(g) < 500:
             H = H.toarray()
             id_matrix = np.eye(len(g))
             lp_solve = lambda A,b: solve(A,b, assume_a= 'pos')
