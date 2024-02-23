@@ -1,6 +1,11 @@
+# --------------------------------------------------------------------------------
+# This file incorporates code from "opt_methods" by Konstantin Mishchenko
+# available at https://github.com/konstmish/opt_methods
+#
+# "opt_methods" is licensed under the MIT License. You can find a copy of the license at https://github.com/konstmish/opt_methods/blob/master/LICENSE
+# --------------------------------------------------------------------------------
 import numpy as np
 import copy
-import pickle
 # from tqdm.notebook import tqdm
 from tqdm import tqdm
 import time
@@ -165,15 +170,3 @@ class Optimizer:
         self.x_old_tol = None
         self.trace = Trace(loss=loss, label=self.label)
         self.finished_seeds = []
-    
-    # @classmethod
-    def from_pickle(self, path, loss=None):
-        if not os.path.isfile(path):
-            return None
-        with open(path, 'rb') as f:
-            trace = pickle.load(f)
-            trace.loss = loss
-            self.trace = trace
-        # if loss is not None:
-        #     loss.f_opt = min(self.best_loss_value, loss.f_opt)
-        # return trace
