@@ -1,3 +1,12 @@
+# --------------------------------------------------------------------------------
+# This file incorporates code from "opt_methods" by Konstantin Mishchenko
+# available at https://github.com/konstmish/opt_methods/blob/master/optmethods/opt_trace.py
+#
+# "opt_methods" is licensed under the MIT License. You can find a copy of the license at https://github.com/konstmish/opt_methods/blob/master/LICENSE
+# Here is a brief summary of the changes made to the original code:
+# - Removed the class "StochasticTrace"
+# 
+# --------------------------------------------------------------------------------
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
@@ -109,135 +118,3 @@ class Trace:
         if loss is not None:
             loss.f_opt = min(self.best_loss_value, loss.f_opt)
         return trace
-        
-        
-# class StochasticTrace:
-#     """
-#     Class that stores the logs of running a stochastic
-#     optimization method and plots the trajectory.
-#     """
-#     def __init__(self, loss, label=None):
-#         self.loss = loss
-#         self.label = label
-        
-#         self.xs_all = {}
-#         self.ts_all = {}
-#         self.its_all = {}
-#         self.loss_vals_all = {}
-#         self.its_converted_to_epochs = False
-#         self.loss_is_computed = False
-        
-#     def init_seed(self):
-#         self.xs = []
-#         self.ts = []
-#         self.its = []
-#         self.loss_vals = None
-        
-#     def append_seed_results(self, seed):
-#         self.xs_all[seed] = self.xs.copy()
-#         self.ts_all[seed] = self.ts.copy()
-#         self.its_all[seed] = self.its.copy()
-#         self.loss_vals_all[seed] = self.loss_vals.copy() if self.loss_vals else None
-    
-#     def compute_loss_of_iterates(self):
-#         for seed, loss_vals in self.loss_vals_all.items():
-#             if loss_vals is None:
-#                 self.loss_vals_all[seed] = np.asarray([self.loss.value(x) for x in self.xs_all[seed]])
-#             else:
-#                 warnings.warn("""Loss values for seed {} have already been computed. 
-#                     Set .loss_vals_all[{}] = [] to recompute.""".format(seed, seed))
-#         self.loss_is_computed = True
-    
-#     @property
-#     def best_loss_value(self):
-#         if not self.loss_is_computed:
-#             self.compute_loss_of_iterates()
-#         return np.min([np.min(loss_vals) for loss_vals in self.loss_vals_all.values()])
-    
-#     def convert_its_to_epochs(self, batch_size=1):
-#         if self.its_converted_to_epochs:
-#             return
-#         self.its_per_epoch = self.loss.n / batch_size
-#         for seed, its in self.its_all.items():
-#             self.its_all[seed] = np.asarray(its) / self.its_per_epoch
-#         self.its = np.asarray(self.its) / self.its_per_epoch
-#         self.its_converted_to_epochs = True
-        
-#     def plot_losses(self, its=None, f_opt=None, log_std=True, label=None, markevery=None, alpha=0.25, *args, **kwargs):
-#         if not self.loss_is_computed:
-#             self.compute_loss_of_iterates()
-#         if its is None:
-#             its = np.mean([np.asarray(its_) for its_ in self.its_all.values()], axis=0)
-#         if f_opt is None:
-#             f_opt = self.loss.f_opt
-#         if log_std:
-#             y_log = [np.log(loss_vals-f_opt) for loss_vals in self.loss_vals_all.values()]
-#             y_log_ave = np.mean(y_log, axis=0)
-#             y_log_std = np.std(y_log, axis=0, ddof=1)
-#             lower, upper = np.exp(y_log_ave - y_log_std), np.exp(y_log_ave + y_log_std)
-#             y_ave = np.exp(y_log_ave)
-#         else:
-#             y = [loss_vals-f_opt for loss_vals in self.loss_vals_all.values()]
-#             y_ave = np.mean(y, axis=0)
-#             y_std = np.std(y, axis=0, ddof=1)
-#             lower, upper = y_ave - y_std, y_ave + y_std
-#         if label is None:
-#             label = self.label
-#         if markevery is None:
-#             markevery = max(1, len(y_ave)//20)
-            
-#         plot = plt.plot(its, y_ave, label=label, markevery=markevery, *args, **kwargs)
-#         if len(self.loss_vals_all.keys()) > 1:
-#             plt.fill_between(its, lower, upper, alpha=alpha, color=plot[0].get_color())
-#         plt.ylabel(r'$f(x)-f^*$')
-        
-#     def plot_distances(self, its=None, x_opt=None, log_std=True, label=None, markevery=None, alpha=0.25, *args, **kwargs):
-#         if its is None:
-#             its = np.mean([np.asarray(its_) for its_ in self.its_all.values()], axis=0)
-#         if x_opt is None:
-#             if self.loss.x_opt is None:
-#                 x_opt = self.xs[-1]
-#             else:
-#                 x_opt = self.loss.x_opt
-        
-#         dists = [np.asarray([self.loss.norm(x-x_opt)**2 for x in xs]) for xs in self.xs_all.values()]
-#         if log_std:
-#             y_log = [np.log(dist) for dist in dists]
-#             y_log_ave = np.mean(y_log, axis=0)
-#             y_log_std = np.std(y_log, axis=0, ddof=1)
-#             lower, upper = np.exp(y_log_ave - y_log_std), np.exp(y_log_ave + y_log_std)
-#             y_ave = np.exp(y_log_ave)
-#         else:
-#             y = dists
-#             y_ave = np.mean(y, axis=0)
-#             y_std = np.std(y, axis=0, ddof=1)
-#             lower, upper = y_ave - y_std, y_ave + y_std
-#         if label is None:
-#             label = self.label
-#         if markevery is None:
-#             markevery = max(1, len(y_ave)//20)
-            
-#         plot = plt.plot(its, y_ave, label=label, markevery=markevery, *args, **kwargs)
-#         if len(self.xs_all.keys()) > 1:
-#             plt.fill_between(its, lower, upper, alpha=alpha, color=plot[0].get_color())
-#         plt.ylabel(r'$\Vert x-x^*\Vert^2$')
-        
-#     def save(self, file_name=None, path='./results/'):
-#         if file_name is None:
-#             file_name = self.label
-#         if path[-1] != '/':
-#             path += '/'
-#         self.loss = None
-#         Path(path).mkdir(parents=True, exist_ok=True)
-#         f = open(path + file_name, 'wb')
-#         pickle.dump(self, f)
-#         f.close()
-        
-#     @classmethod
-#     def from_pickle(cls, path, loss):
-#         if not os.path.isfile(path):
-#             return None
-#         with open(path, 'rb') as f:
-#             trace = pickle.load(f)
-#             trace.loss = loss
-#         return trace
