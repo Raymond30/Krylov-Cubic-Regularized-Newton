@@ -1,6 +1,6 @@
 # --------------------------------------------------------------------------------
 # This file incorporates code from "opt_methods" by Konstantin Mishchenko
-# available at https://github.com/konstmish/opt_methods
+# available at https://github.com/konstmish/opt_methods/blob/master/optmethods/optimizer.py
 #
 # "opt_methods" is licensed under the MIT License. You can find a copy of the license at https://github.com/konstmish/opt_methods/blob/master/LICENSE
 # --------------------------------------------------------------------------------
