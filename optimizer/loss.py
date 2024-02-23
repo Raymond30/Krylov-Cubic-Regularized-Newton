@@ -1,3 +1,14 @@
+# --------------------------------------------------------------------------------
+# This file incorporates code from "opt_methods" by Konstantin Mishchenko
+# available at https://github.com/konstmish/opt_methods/tree/master/optmethods/loss
+#
+# "opt_methods" is licensed under the MIT License. You can find a copy of the license at https://github.com/konstmish/opt_methods/blob/master/LICENSE
+# Here is a brief summary of the changes made to the original code:
+# - Removed unused functions in the class "LogisticRegression", such as "stochastic_gradient" and "stochastic_hessian"
+# - Added the functions "partial_gradient" and "partial_hessian", which are used in the SSCN method
+# - Modified the function "hess_vec_prod", so it computes the exact Hessian-vector product instead of a finite difference approximation
+# 
+# --------------------------------------------------------------------------------
 import copy
 import numpy as np
 import warnings
@@ -224,61 +235,16 @@ class LogisticRegression(Oracle):
         """
         Return the partial gradient at x with indices in I
         """
-        # time_start = time.time()
         Ax = self.mat_vec_product(x)
-        # print('Ax time: {}'.format(time.time()-time_start))
-
-        # time_start = time.time()
         activation = scipy.special.expit(Ax)
-        # print('Activation time: {}'.format(time.time()-time_start))
         if self.l2 == 0:
-            # time_start = time.time()
             grad = self.A[:,I].T @ (activation-self.b)/self.n
-            # print('grad time: {}'.format(time.time()-time_start))
         else:
             grad = safe_sparse_add(self.A[:,I].T @ (activation-self.b)/self.n, self.l2*x[I])
         if scipy.sparse.issparse(x):
+            # return a sparse vector
             grad = scipy.sparse.csr_matrix(grad).T
         return grad
-    
-    # def stochastic_gradient(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
-    #                         importance_sampling=False, p=None, rng=None, return_idx=False):
-    #     """
-    #     normalization is needed for Shuffling optimizer
-    #         to remove the bias of the last (incomplete) minibatch
-    #     """
-    #     if idx is None:
-    #         if rng is None:
-    #             rng = self.rng
-    #         if p is None and importance_sampling:
-    #             if self._importance_probs is None:
-    #                 self._importance_probs = self.individ_smoothness
-    #                 self._importance_probs /= sum(self._importance_probs)
-    #             p = self._importance_probs
-    #         idx = np.random.choice(self.n, size=batch_size, replace=replace, p=p)
-    #     else:
-    #         batch_size = 1 if np.isscalar(idx) else len(idx)
-    #     if normalization is None:
-    #         if p is None:
-    #             normalization = batch_size
-    #         else:
-    #             normalization = batch_size * p[idx] * self.n
-    #     A_idx = self.A[idx]
-    #     Ax = A_idx @ x
-    #     if scipy.sparse.issparse(Ax):
-    #         Ax = Ax.toarray().ravel()
-    #     activation = scipy.special.expit(Ax)
-    #     if scipy.sparse.issparse(x):
-    #         error = scipy.sparse.csr_matrix((activation-self.b[idx]) / normalization)
-    #     else:
-    #         error = (activation-self.b[idx]) / normalization
-    #     if not np.isscalar(error):
-    #         grad = self.l2*x + (error@A_idx).T
-    #     else:
-    #         grad = self.l2*x + error*A_idx.T
-    #     if return_idx:
-    #         return (grad, idx)
-    #     return grad
     
     def hessian(self, x):
         Ax = self.mat_vec_product(x)
@@ -289,39 +255,13 @@ class LogisticRegression(Oracle):
         return A_weighted@self.A/self.n + self.l2*np.eye(self.dim)
     
     def partial_hessian(self, x, I):
-        # time_start = time.time()
         Ax = self.mat_vec_product(x)
-        # print('Ax time: {}'.format(time.time()-time_start))
         activation = scipy.special.expit(Ax)
         weights = activation * (1-activation)
-        # time_start = time.time()
         A_weighted = safe_sparse_multiply(self.A[:,I].T, weights)
         # A_weighted = self.A[:,I].T.multiply(weights) 
-        # print('A_weighted time: {}'.format(time.time()-time_start))
         dim = len(I)
         return A_weighted@self.A[:,I]/self.n + self.l2*sparse.eye(dim)
-    
-    # def stochastic_hessian(self, x, idx=None, batch_size=1, replace=False, normalization=None, 
-    #                        rng=None, return_idx=False):
-    #     if idx is None:
-    #         if rng is None:
-    #             rng = self.rng
-    #         idx = rng.choice(self.n, size=batch_size, replace=replace)
-    #     else:
-    #         batch_size = 1 if np.isscalar(idx) else len(idx)
-    #     if normalization is None:
-    #         normalization = batch_size
-    #     A_idx = self.A[idx]
-    #     Ax = A_idx @ x
-    #     if scipy.sparse.issparse(Ax):
-    #         Ax = Ax.toarray().ravel()
-    #     activation = scipy.special.expit(Ax)
-    #     weights = activation * (1-activation)
-    #     A_weighted = safe_sparse_multiply(A_idx.T, weights)
-    #     hess = A_weighted@A_idx/normalization + self.l2*np.eye(self.dim)
-    #     if return_idx:
-    #         return (hess, idx)
-    #     return hess
     
     def mat_vec_product(self, x):
         if self.store_mat_vec_prod and (self.reuse or self.is_equal(x, self.x_last)):
@@ -396,20 +336,6 @@ class LogisticRegression(Oracle):
         self._ave_smoothness = 0.25*ave_squared_sum + self.l2
         return self._ave_smoothness
     
-    # def batch_smoothness(self, batch_size):
-    #     "Smoothness constant of stochastic gradients sampled in minibatches"
-    #     L = self.smoothness
-    #     L_max = self.max_smoothness
-    #     L_batch = self.n / (self.n-1) * (1-1/batch_size) * L + (self.n/batch_size-1) / (self.n-1) * L_max
-    #     return L_batch
-    
-    # @property
-    # def individ_smoothness(self):
-    #     if self._individ_smoothness is not None:
-    #         return self._individ_smoothness
-    #     self._individ_smoothness = row_norms(self.A)
-    #     return self._individ_smoothness
-    
     @property
     def hessian_lipschitz(self):
         if self._hessian_lipschitz is not None:
@@ -455,146 +381,3 @@ class LogisticRegression(Oracle):
         else:
             dty = 0 if x is None else float((x!=0).sum()) / x.size
         return dty        
-
-
-class LogSumExp(Oracle):
-    """
-    Logarithm of the sum of exponentials plus two optional quadratic terms:
-        log(sum_{i=1}^n exp(<a_i, x>-b_i)) + 1/2*||Ax - b||^2 + l2/2*||x||^2
-    See, for instance,
-        https://arxiv.org/pdf/2002.00657.pdf
-        https://arxiv.org/pdf/2002.09403.pdf
-    for examples of using the objective to benchmark second-order methods.
-    
-    Due to the potential under- and overflow, log-sum-exp and softmax
-    functions might be unstable. This implementation has not been tested
-    for stability and an alternative choice of functions may lead to
-    more precise results. See
-        https://academic.oup.com/imajna/advance-article/doi/10.1093/imanum/draa038/5893596
-    for a discussion of possible ways to increase stability.
-    
-    Sparse matrices are currently not supported as it is not clear if it is relevant to practice.
-    
-    Arguments:
-        max_smoothing (float, optional): the smoothing constant of the log-sum-exp term
-        least_squares_term (bool, optional): add term 0.5*||Ax-b||^2 to the objective (default: False)
-    """
-    
-    def __init__(self, max_smoothing=1, least_squares_term=False, A=None, b=None, n=None, dim=None, store_mat_vec_prod=True, store_softmax=True, *args, **kwargs):
-        super(LogSumExp, self).__init__(*args, **kwargs)
-        self.max_smoothing = max_smoothing
-        self.least_squares_term = least_squares_term
-        self.A = A
-        self.b = np.asarray(b)
-        if b is None:
-            # self.b = self.rng.normal(-1, 1, size=n)
-            self.b = self.rng.uniform(-1, 1, size=n)
-        if A is None:
-            self.A = self.rng.uniform(-1, 1, size=(n, dim))
-            # for the first gradient computation, we have to set 
-            # the values of self.store_mat_vec_prod and self.store_softmax
-            self.store_mat_vec_prod = False
-            self.store_softmax = False
-            self.A -= self.gradient(np.zeros(dim))
-            self.value(np.zeros(dim))
-        self.store_mat_vec_prod = store_mat_vec_prod
-        self.store_softmax = store_softmax
-        
-        self.n, self.dim = self.A.shape
-        self.x_last_mv = 0.
-        self.x_last_soft = 0.
-        self._mat_vec_prod = np.zeros(self.n)
-    
-    def _value(self, x):
-        Ax = self.mat_vec_product(x)
-        regularization = 0
-        if self.l2 != 0:
-            regularization = self.l2/2 * self.norm(x)**2
-        if self.least_squares_term:
-            regularization += 1/2 * np.linalg.norm(Ax)**2
-        return self.max_smoothing*scipy.special.logsumexp(((Ax-self.b)/self.max_smoothing)) + regularization
-    
-    def gradient(self, x):
-        Ax = self.mat_vec_product(x)
-        softmax = self.softmax(Ax=Ax)
-        if self.least_squares_term:
-            grad = (softmax + Ax) @ self.A
-        else:
-            grad = softmax @ self.A
-            
-        if self.l2 == 0:
-            return grad
-        return grad + self.l2 * x
-    
-    def hessian(self, x):
-        Ax = self.mat_vec_product(x)
-        softmax = self.softmax(x=x, Ax=Ax)
-        hess1 = self.A.T * (softmax/self.max_smoothing) @ self.A
-        grad = softmax @ self.A
-        hess2 = -np.outer(grad, grad) / self.max_smoothing
-        return hess1 + hess2 + self.l2 * np.eye(self.dim)
-    
-    def mat_vec_product(self, x):
-        if self.store_mat_vec_prod and self.is_equal(x, self.x_last_mv):
-            return self._mat_vec_prod
-        
-        Ax = self.A @ x
-        if self.store_mat_vec_prod:
-            self._mat_vec_prod = Ax
-            self.x_last_mv = x.copy()
-        return Ax
-    
-    def softmax(self, x=None, Ax=None):
-        if x is None and Ax is None:
-            raise ValueError("Either x or Ax must be provided to compute softmax.")
-        if self.store_softmax and self.is_equal(x, self.x_last_soft):
-            return self._softmax
-        if Ax is None:
-            Ax = self.mat_vec_product(x)
-        
-        softmax = scipy.special.softmax((Ax-self.b) / self.max_smoothing)
-        if self.store_softmax and x is not None:
-            self._softmax = softmax
-            self.x_last_soft = x.copy()
-        return softmax
-    
-    def hess_vec_prod(self, x, v, grad_dif=False, eps=None):
-        Ax = self.mat_vec_product(x)
-        softmax = self.softmax(x=x, Ax=Ax)
-        
-    @property
-    def smoothness(self):
-        if self._smoothness is not None:
-            return self._smoothness
-        matrix_coef = 1 + self.least_squares_term
-        if self.dim > 20000 and self.n > 20000:
-            warnings.warn("The matrix is too large to estimate the smoothness constant, so Frobeniius estimate is used instead.")
-            self._smoothness = matrix_coef*np.linalg.norm(self.A, ord='fro')**2 + self.l2
-        else:
-            sing_val_max = scipy.sparse.linalg.svds(self.A, k=1, return_singular_vectors=False)[0]
-            self._smoothness = matrix_coef*sing_val_max**2 + self.l2
-        return self._smoothness
-    
-    @property
-    def hessian_lipschitz(self):
-        if self._hessian_lipschitz is None:
-            row_norms = np.linalg.norm(self.A, axis=1)
-            max_row_norm = np.max(row_norms)
-            self._hessian_lipschitz = 2 * max_row_norm / self.max_smoothing * self.smoothness
-        return self._hessian_lipschitz
-    
-    @staticmethod
-    def norm(x):
-        return np.linalg.norm(x)
-    
-    @staticmethod
-    def inner_prod(x, y):
-        return x @ y
-    
-    @staticmethod
-    def outer_prod(x, y):
-        return np.outer(x, y)
-    
-    @staticmethod
-    def is_equal(x, y):
-        return np.array_equal(x, y)
