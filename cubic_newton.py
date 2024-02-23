@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Cubic Regularized Newton Methods')
     parser.add_argument('--dataset', metavar='DATASETS', default='w8a', type=str,
                     help='The dataset')
-    parser.add_argument('--plot_time', dest='flag_time', action='store_true',
+    parser.add_argument('--plot_time', dest='plot_time', action='store_true',
                     help='Plot with respect to time')
     parser.add_argument('--it_max', default=50000, type=int, metavar='IT',
                     help='max iteration')
@@ -23,26 +23,26 @@ if __name__ == '__main__':
                     help='max time')
     
     parser.add_argument('--SSCN_dim', nargs='+', default=10, type=int, metavar='D',
-                    help='Subspace dimensions in SSCN')
+                    help='Subspace dimensions of SSCN')
     
     args = parser.parse_args()
     dataset = args.dataset
-    flag_time = args.flag_time
+    plot_time = args.plot_time
     it_max = args.it_max
     time_max = args.time_max
 
     m_list = args.SSCN_dim
     if isinstance(m_list, int):
         m_list = [m_list]
-    # Define the loss function
+
+    # Load LIBSVM datasets
     # dataset = 'gisette_scale'
     # dataset = 'madelon'
-    
     # dataset = 'rcv1_train.binary'
     # dataset = 'news20.binary'
     data_url = "https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/{}".format(dataset)
 
-    if dataset in {'gisette_scale','duke','rcv1_train.binary','news20.binary'}: # or dataset == 'epsilon_normalized':
+    if dataset in {'gisette_scale','duke','rcv1_train.binary','news20.binary'}:
         data_url = '{}.bz2'.format(data_url)
         data_path = './{}.bz2'.format(dataset)
     else:
@@ -60,29 +60,28 @@ if __name__ == '__main__':
     n, dim = A.shape
     x0 = np.ones(dim) * 0.5
 
-    # flag_time = True # True for time, False for iteration
-    # it_max = 50000
-    # time_max = 60
-
     # Define the optimization algs
+
+    # Krylov Cubic Regularized Newton
     memory_size = 10
-    memory_size_bench = 20
     cub_krylov = Cubic_Krylov_LS(loss=loss, reg_coef = 1e-3, label='Krylov CRN (m = {})'.format(memory_size),
                             subspace_dim=memory_size, tolerance = 1e-9)
     
     # cub_krylov_bench is used to compute the optimal value of the function
+    memory_size_bench = 20
     cub_krylov_bench = Cubic_Krylov_LS(loss=loss, reg_coef= 1e-3, label='Benchmark Krylov CRN (m = {})'.format(memory_size_bench),
                                subspace_dim=memory_size_bench, tolerance = 1e-9)
     
-    if dim < 500:
+    # Cubic Regularized Newton
+    if dim < 500: 
+    # When dim is small, directly solve the linear systems of equations in cubic subproblems
         cubic_solver = "full"
-    else:
+    else: 
+    # Otherwise, use conjugate gradient method 
         cubic_solver = "CG"
     cub_root = Cubic_LS(loss=loss, reg_coef = 1e-3, label='CRN', cubic_solver=cubic_solver, tolerance = 1e-8)
 
-    # sscn = SSCN(loss=loss_csc, reg_coef = 1e-3, label='SSCN (m = {})'.format(memory_size),
-    #                         subspace_dim=memory_size, tolerance = 1e-9)
-
+    # Stochastic Subspace Cubic Newton
     sscn_list = [ ]
     for m in m_list:
         sscn_list.append(SSCN(loss=loss_csc, reg_coef = 1e-3, label='SSCN (m = {})'.format(m),
@@ -90,9 +89,6 @@ if __name__ == '__main__':
 
     
     # Running algs
-
-    
-
     # Cubic regularized Newton
     print(f'Running optimizer: {cub_root.label}')
     cub_root.run(x0=x0, it_max=it_max, t_max=time_max)
@@ -122,12 +118,13 @@ if __name__ == '__main__':
 
     color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
+    # Ref: https://stackoverflow.com/a/39566040
     SMALL_SIZE = 10
     MEDIUM_SIZE = 12
     BIGGER_SIZE = 14
 
     plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-    plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+    plt.rc('axes', titlesize=MEDIUM_SIZE)    # fontsize of the axes title
     plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
     plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
     plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
@@ -135,18 +132,11 @@ if __name__ == '__main__':
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
     f_opt = min(loss.f_opt, loss_csc.f_opt)
-    # gd.trace.plot_losses(marker='^', time=flag_time)
-    # cub_krylov.trace.plot_losses(marker='>', label='cubic Newton (Krylov subspace)')
-    # cub_root.trace.plot_losses(marker='o', label='cubic Newton (exact)')
-
-
-    cub_root.trace.plot_losses(marker='o', markersize=5, f_opt=f_opt, time=flag_time, label='CRN')
-
+    cub_root.trace.plot_losses(marker='o', markersize=5, f_opt=f_opt, time=plot_time)
     for algs in sscn_list:
-        algs.trace.plot_losses(marker='^', markersize=6, f_opt=f_opt, time=flag_time)
-
-    cub_krylov.trace.plot_losses(marker='v', markersize=6, f_opt=f_opt, time=flag_time, color = color_cycle[7], label='Krylov CRN (m = 10)')
-    if flag_time:
+        algs.trace.plot_losses(marker='^', markersize=6, f_opt=f_opt, time=plot_time)
+    cub_krylov.trace.plot_losses(marker='v', markersize=6, f_opt=f_opt, time=plot_time, color = color_cycle[7])
+    if plot_time:
         plt.xlabel('Time (s)')
     else:
         plt.xlabel('Iteration')
@@ -158,7 +148,7 @@ if __name__ == '__main__':
     if not os.path.exists('figs'):
         os.makedirs('figs')
 
-    if flag_time:
+    if plot_time:
         plt.savefig('figs/time_{}.pdf'.format(dataset))
     else:
         plt.savefig('figs/iteration_{}.pdf'.format(dataset))
