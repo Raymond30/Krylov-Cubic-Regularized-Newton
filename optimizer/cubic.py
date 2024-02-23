@@ -1,9 +1,21 @@
+# --------------------------------------------------------------------------------
+# This file incorporates code from "opt_methods" by Konstantin Mishchenko
+# available at https://github.com/konstmish/opt_methods/blob/master/optmethods/second_order/cubic.py
+#
+# "opt_methods" is licensed under the MIT License. You can find a copy of the license at https://github.com/konstmish/opt_methods/blob/master/LICENSE
+# Here is a brief summary of the changes made to the original code:
+# - Reimplemented the cubic subproblem solver by solving a 1-d nonlinear equation with Newton's method
+# - Added Lanczos method for computing bases of Krylov subspace
+# - Reimplemented the cubic regularized Newton method with line search
+# - Added Krylov cubic regularized Newton method and stochastic subspace cubic Newton method
+#
+# --------------------------------------------------------------------------------
 import numpy as np
 import numpy.linalg as la
 import copy
 
 from scipy.optimize import root_scalar
-from scipy.linalg import eigh, solve 
+from scipy.linalg import solve 
 
 from scipy import sparse
 from scipy.sparse.linalg import cg, LinearOperator, spsolve
@@ -11,13 +23,9 @@ from scipy.sparse.linalg import cg, LinearOperator, spsolve
 
 import random
 import os
-import time
+# import time
 
 from optimizer.optimizer import Optimizer
-
-
-
-
 
 def set_seed(seed=42):
     """
@@ -27,68 +35,6 @@ def set_seed(seed=42):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
-
-
-
-
-# def ls_cubic_solver(x, g, H, M, it_max=100, epsilon=1e-8, loss=None):
-#     """
-#     Solve min_z <g, z-x> + 1/2<z-x, H(z-x)> + M/3 ||z-x||^3
-    
-#     For explanation of Cauchy point, see "Gradient Descent 
-#         Efficiently Finds the Cubic-Regularized Non-Convex Newton Step"
-#         https://arxiv.org/pdf/1612.00547.pdf
-#     Other potential implementations can be found in paper
-#         "Adaptive cubic regularisation methods"
-#         https://people.maths.ox.ac.uk/cartis/papers/ARCpI.pdf
-#     """
-#     solver_it = 1
-#     newton_step = -np.linalg.solve(H, g)
-#     if M == 0:
-#         return x + newton_step, solver_it
-#     def cauchy_point(g, H, M):
-#         if la.norm(g) == 0 or M == 0:
-#             return 0 * g
-#         g_dir = g / la.norm(g)
-#         H_g_g = H @ g_dir @ g_dir
-#         R = -H_g_g / (2*M) + np.sqrt((H_g_g/M)**2/4 + la.norm(g)/M)
-#         return -R * g_dir
-    
-#     def conv_criterion(s, r):
-#         """
-#         The convergence criterion is an increasing and concave function in r
-#         and it is equal to 0 only if r is the solution to the cubic problem
-#         """
-#         s_norm = la.norm(s)
-#         return 1/s_norm - 1/r
-    
-#     # Solution s satisfies ||s|| >= Cauchy_radius
-#     r_min = la.norm(cauchy_point(g, H, M))
-    
-#     if loss is not None:
-#         x_new = x + newton_step
-#         if loss.value(x) > loss.value(x_new):
-#             return x_new, solver_it
-        
-#     r_max = la.norm(newton_step)
-#     if r_max - r_min < epsilon:
-#         return x + newton_step, solver_it
-#     id_matrix = np.eye(len(g))
-#     for _ in range(it_max):
-#         r_try = (r_min + r_max) / 2
-#         lam = r_try * M
-#         s_lam = -np.linalg.solve(H + lam*id_matrix, g)
-#         solver_it += 1
-#         crit = conv_criterion(s_lam, r_try)
-#         if np.abs(crit) < epsilon:
-#             return x + s_lam, solver_it
-#         if crit < 0:
-#             r_min = r_try
-#         else:
-#             r_max = r_try
-#         if r_max - r_min < epsilon:
-#             break
-#     return x + s_lam, solver_it
 
 
 def cubic_solver_root(g, H, M, it_max=100, epsilon=1e-8, r0 = 0.1):
@@ -165,64 +111,6 @@ def Lanczos(A,v,m=10):
     return V, alphas, betas, beta
 
 
-# class Cubic(Optimizer):
-#     """
-#     Newton method with cubic regularization for global convergence.
-#     The method was studied by Nesterov and Polyak in the following paper:
-#         "Cubic regularization of Newton method and its global performance"
-#         https://link.springer.com/article/10.1007/s10107-006-0706-8
-    
-#     Arguments:
-#         reg_coef (float, optional): an estimate of the Hessian's Lipschitz constant
-#     """
-#     def __init__(self, reg_coef=None, solver_it_max=100, solver_eps=1e-8, cubic_solver="root", *args, **kwargs):
-#         super(Cubic, self).__init__(*args, **kwargs)
-#         self.reg_coef = reg_coef
-#         self.cubic_solver = cubic_solver
-#         self.solver_it = 0
-#         self.solver_it_max = solver_it_max
-#         self.solver_eps = solver_eps
-
-#         self.r0 = 0.1
-#         self.residuals = []
-#         self.cubic_solver = cubic_solver
-
-#         if reg_coef is None:
-#             self.reg_coef = self.loss.hessian_lipschitz
-#         if cubic_solver == "GD": 
-#             self.cubic_solver = ls_cubic_solver
-#         elif cubic_solver == "root":
-#             self.cubic_solver = cubic_solver_root
-#         elif cubic_solver == "krylov":
-#             self.cubic_solver = cubic_solver_krylov
-#         else:
-#             print("Error: cubic_solver not recognized")
-#         # if cubic_solver is None:
-#         #     # self.cubic_solver = ls_cubic_solver
-#         #     self.cubic_solver = cubic_solver_root
-        
-#     def step(self):
-#         self.grad = self.loss.gradient(self.x)
-
-#         if self.cubic_solver is cubic_solver_krylov:
-#             self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
-#         else:
-#             self.hess = self.loss.hessian(self.x)
-#         # self.hess = self.loss.hessian(self.x)
-#         reg_coef = self.reg_coef
-#         self.x, solver_it, self.r0, residual, model_decrease = self.cubic_solver(self.x, self.grad, self.hess, reg_coef, self.solver_it_max, self.solver_eps, r0 = self.r0)
-#         self.solver_it += solver_it
-#         self.residuals.append(residual)
-        
-#     def init_run(self, *args, **kwargs):
-#         super(Cubic, self).init_run(*args, **kwargs)
-#         self.trace.solver_its = [0]
-#         self.loss.reset()
-        
-#     def update_trace(self):
-#         super(Cubic, self).update_trace()
-#         self.trace.solver_its.append(self.solver_it)
-
 
 class Cubic_LS(Optimizer):
     """
@@ -234,6 +122,8 @@ class Cubic_LS(Optimizer):
     Arguments:
         reg_coef (float, optional): an estimate of the Hessian's Lipschitz constant
         cubic_solver: either "CG" or "full". It specifies how to solve the linear system of equations resulting from the cubic subproblem
+        solver_it_max: the maximum iterations for solving the cubic subproblem
+        solver_eps: the accuracy for solving the cubic subproblem
         beta (float, optional): the backtracking parameter
     """
     def __init__(self, reg_coef=None, cubic_solver="CG", solver_it_max=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
@@ -310,11 +200,10 @@ class Cubic_LS(Optimizer):
         # Terminate if the gradient norm is small
         if np.linalg.norm(self.grad) < self.tolerance:
             return
-        # set the initial value of the regularization coefficient
+        # Set the initial value of the regularization coefficient
         reg_coef = self.reg_coef*self.beta
 
-        # LS_start = time.time()
-
+        # Solve the cubic subproblem
         s_new, solver_it, r0_new, model_decrease = self.cubic_solver( 
         reg_coef, self.solver_it_max, self.solver_eps, r0 = self.r0)
 
@@ -323,6 +212,7 @@ class Cubic_LS(Optimizer):
 
         # Backtracking line search
         while value_new > self.value - model_decrease:
+            # If the sufficient decrease condition is not satisfied, then we increase the regularization parameter
             reg_coef = reg_coef/self.beta
             s_new, solver_it, r0_new, model_decrease = self.cubic_solver( 
             reg_coef, self.solver_it_max, self.solver_eps, r0 = self.r0)
@@ -334,9 +224,6 @@ class Cubic_LS(Optimizer):
         self.r0 = r0_new
         
         self.solver_it += solver_it
-        # self.residuals.append(residual)
-        # LS_end = time.time()
-        # print('LS Time {time:.3f}'.format(time=LS_end - LS_start))
         
     def init_run(self, *args, **kwargs):
         super(Cubic_LS, self).init_run(*args, **kwargs)
@@ -355,6 +242,7 @@ class Cubic_Krylov_LS(Optimizer):
     Arguments:
         reg_coef (float, optional): an estimate of the Hessian's Lipschitz constant
         subspace_dim (int, optional): The dimension of the Krylov subspace
+        solver_eps: the accuracy for solving the cubic subproblem
         beta (float, optional): the backtracking parameter
     """
     def __init__(self, reg_coef=None, subspace_dim=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
@@ -379,16 +267,12 @@ class Cubic_Krylov_LS(Optimizer):
         if self.value is None:
             self.value = self.loss.value(self.x)
         
-        # time_start = time.time()
         self.grad = self.loss.gradient(self.x)
-        # print('Grad time: {:.3f}'.format(time.time()-time_start))
-
-        # if self.cubic_solver is cubic_solver_krylov:    
+   
+        # We access Hessian via the Hessian vector product
         self.hess = lambda v: self.loss.hess_vec_prod(self.x,v)
-        # krylov_start = time.time()
+        # Use Lanczos method to compute an orthogonal basis for the Krylov subspace
         V, alphas, betas, beta = Lanczos(self.hess, self.grad, m=self.subspace_dim)
-        # krylov_end = time.time()
-        # print('Krylov Time {time:.3f}'.format(time=krylov_end - krylov_start))
 
         # The subspace Hessian
         self.hess = np.diag(alphas) + np.diag(betas, -1) + np.diag(betas, 1)
@@ -398,12 +282,8 @@ class Cubic_Krylov_LS(Optimizer):
         e1[0] = 1
         self.grad = np.linalg.norm(self.grad)*e1
 
-        # if np.linalg.norm(self.grad) < self.tolerance:
-        #     return
         # set the initial value of the regularization coefficient
         reg_coef = self.reg_coef*self.beta
-
-        # LS_start = time.time()
 
         # Solve the cubic subproblem over the subspace
         s_new, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
@@ -428,10 +308,6 @@ class Cubic_Krylov_LS(Optimizer):
         
         self.solver_it += solver_it
 
-        # print('Iteration time: {:.3f}'.format(time.time()-time_start))
-        # self.residuals.append(residual)
-        # LS_end = time.time()
-        # print('LS Time {time:.3f}'.format(time=LS_end - LS_start))
         
     def init_run(self, *args, **kwargs):
         super(Cubic_Krylov_LS, self).init_run(*args, **kwargs)
@@ -452,6 +328,7 @@ class SSCN(Optimizer):
     Arguments:
         reg_coef (float, optional): an estimate of the Hessian's Lipschitz constant
         subspace_dim (int, optional): the dimension of the random subspace
+        solver_eps: the accuracy for solving the cubic subproblem
         beta (float, optional): the backtracking parameter
     """
     def __init__(self, reg_coef=None, subspace_dim=100, solver_eps=1e-8, beta=0.5, *args, **kwargs):
@@ -480,32 +357,23 @@ class SSCN(Optimizer):
         I = self.rng.choice(self.dim, size=self.subspace_dim, replace=False)
         
         # compute coordinate gradient
-        # grad_start = time.time()
         self.grad = self.loss.partial_gradient(self.x, I)
-        # grad_end = time.time()
-        # print('Gradient time: {}'.format(grad_end-grad_start))
 
         # compute coordinate Hessian
-        # hess_start = time.time()
         self.hess = self.loss.partial_hessian(self.x, I)
-        # hess_end = time.time()
-        # print('Hessian time: {}'.format(hess_end-hess_start))
 
-        # if np.linalg.norm(self.grad) < self.tolerance:
-        #     return
         # set the initial value of the regularization coefficient
         reg_coef = max(self.reg_coef*self.beta, np.finfo(float).eps)
 
 
-        # x_sub = self.x[I]
+        # set x_new to be self.x
         x_new = copy.deepcopy(self.x)
         Ax = copy.deepcopy(self.loss._mat_vec_prod)
 
-        # time_start = time.time()
         s_new_sub, solver_it, r0_new, model_decrease = cubic_solver_root(self.grad, self.hess, 
         reg_coef, r0 = self.r0, epsilon=np.finfo(float).eps)
+        # update the chosen coordinates in x_new
         x_new[I] = self.x[I] + s_new_sub
-        # print('Cubic solving time: {}'.format(time.time()-time_start))
 
         # update Ax in the memory
         self.loss.update_mat_vec_product(Ax, s_new_sub, I)
