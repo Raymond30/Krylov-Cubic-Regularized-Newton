@@ -4,7 +4,7 @@
 
 This repository contains the python code for the numerical experiments in our paper [Krylov Cubic Regularized Newton: A Subspace Second-Order Method with Dimension-Free Convergence Rate](https://arxiv.org/abs/2401.03058), which has been accepted by AISTATS 2024.   
 
-## How to run
+## How to Run
 
 To reproduce the plots in Figure 2 of our paper, run the bash script "cubic_newton.sh": 
 
