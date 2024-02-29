@@ -118,6 +118,10 @@ if __name__ == '__main__':
 
     color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
+    # Avoid Type 3 fonts in the plots
+    plt.rcParams['pdf.fonttype'] = 42
+    plt.rcParams['ps.fonttype'] = 42
+
     # Ref: https://stackoverflow.com/a/39566040
     SMALL_SIZE = 10
     MEDIUM_SIZE = 12
@@ -130,6 +134,8 @@ if __name__ == '__main__':
     plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
     plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+
 
     f_opt = min(loss.f_opt, loss_csc.f_opt)
     cub_root.trace.plot_losses(marker='o', markersize=5, f_opt=f_opt, time=plot_time)
